@@ -50,7 +50,7 @@ export function Stats() {
         style={{
           backgroundImage: "url('/bsvex/network_matrix.jpg')"
         }}
-      ></div>
+      />
       <div className="relative z-10">
         {/* Stats Cards */}
         <div className="space-y-4">
@@ -90,7 +90,7 @@ export function Stats() {
             ].map((activity, index) => (
               <div key={index} className="flex items-center justify-between py-2 border-b border-white/10 last:border-b-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full" />
                   <div>
                     <div className="text-white text-sm">
                       {activity.amount} {activity.token} burned

@@ -103,118 +103,127 @@ export function TokenBurnForm() {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-      <div className="flex items-center space-x-2 mb-6">
-        <Flame className="text-orange-500" size={24} />
-        <h2 className="text-2xl font-bold text-white">Burn Tokens for BSV</h2>
-      </div>
-
-      {/* Token Selection */}
-      <div className="mb-6">
-        <label className="block text-gray-300 mb-3">Select Token to Burn</label>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {SUPPORTED_TOKENS.map((token) => (
-            <button
-              key={token.id}
-              onClick={() => setSelectedToken(token)}
-              className={`p-3 rounded-lg border transition-colors ${
-                selectedToken.id === token.id
-                  ? "border-orange-500 bg-orange-500/20"
-                  : "border-white/20 hover:border-white/40"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl">{token.icon}</span>
-                <div className="text-left">
-                  <div className="text-white font-medium">{token.symbol}</div>
-                  <div className="text-gray-400 text-sm">{token.name}</div>
-                </div>
-              </div>
-            </button>
-          ))}
+    <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-5"
+        style={{
+          backgroundImage: "url('/bsvex/burning-bsv.jpg')"
+        }}
+      ></div>
+      <div className="relative z-10">
+        <div className="flex items-center space-x-2 mb-6">
+          <Flame className="text-orange-500" size={24} />
+          <h2 className="text-2xl font-bold text-white">Burn Tokens for BSV</h2>
         </div>
-      </div>
 
-      {/* Amount Input */}
-      <div className="mb-6">
-        <label className="block text-gray-300 mb-2">
-          Amount to Burn ({selectedToken.symbol})
-        </label>
-        <input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.0"
-          className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500"
-        />
-      </div>
+        {/* Token Selection */}
+        <div className="mb-6">
+          <label className="block text-gray-300 mb-3">Select Token to Burn</label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {SUPPORTED_TOKENS.map((token) => (
+              <button
+                key={token.id}
+                onClick={() => setSelectedToken(token)}
+                className={`p-3 rounded-lg border transition-colors ${
+                  selectedToken.id === token.id
+                    ? "border-orange-500 bg-orange-500/20"
+                    : "border-white/20 hover:border-white/40"
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">{token.icon}</span>
+                  <div className="text-left">
+                    <div className="text-white font-medium">{token.symbol}</div>
+                    <div className="text-gray-400 text-sm">{token.name}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
 
-      {/* BSV Address Input */}
-      <div className="mb-6">
-        <label className="block text-gray-300 mb-2">
-          BSV Receiving Address
-        </label>
-        <input
-          type="text"
-          value={bsvAddress}
-          onChange={(e) => setBsvAddress(e.target.value)}
-          placeholder="Enter your BSV address"
-          className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500"
-        />
-      </div>
+        {/* Amount Input */}
+        <div className="mb-6">
+          <label className="block text-gray-300 mb-2">
+            Amount to Burn ({selectedToken.symbol})
+          </label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.0"
+            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500"
+          />
+        </div>
 
-      {/* Exchange Rate Display */}
-      {amount && (
-        <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
-          <div className="flex items-center justify-between text-white">
-            <span>You will receive:</span>
-            <div className="flex items-center space-x-2">
-              <span className="text-2xl">🟠</span>
-              <span className="text-xl font-bold">
-                {calculateBSVAmount(amount, selectedToken)} BSV
-              </span>
+        {/* BSV Address Input */}
+        <div className="mb-6">
+          <label className="block text-gray-300 mb-2">
+            BSV Receiving Address
+          </label>
+          <input
+            type="text"
+            value={bsvAddress}
+            onChange={(e) => setBsvAddress(e.target.value)}
+            placeholder="Enter your BSV address"
+            className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500"
+          />
+        </div>
+
+        {/* Exchange Rate Display */}
+        {amount && (
+          <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between text-white">
+              <span>You will receive:</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">🟠</span>
+                <span className="text-xl font-bold">
+                  {calculateBSVAmount(amount, selectedToken)} BSV
+                </span>
+              </div>
+            </div>
+            <div className="text-gray-400 text-sm mt-1">
+              Exchange rate: 1 {selectedToken.symbol} = {selectedToken.exchangeRate} BSV
             </div>
           </div>
-          <div className="text-gray-400 text-sm mt-1">
-            Exchange rate: 1 {selectedToken.symbol} = {selectedToken.exchangeRate} BSV
-          </div>
-        </div>
-      )}
-
-      {/* Error Display */}
-      {error && (
-        <div className="mb-6 p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-center space-x-2">
-          <AlertCircle className="text-red-400" size={16} />
-          <span className="text-red-400">{error}</span>
-        </div>
-      )}
-
-      {/* Burn Button */}
-      <button
-        onClick={handleBurn}
-        disabled={isProcessing || !amount || !bsvAddress}
-        className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
-      >
-        {isProcessing ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>Processing...</span>
-          </>
-        ) : (
-          <>
-            <Flame size={16} />
-            <span>Burn {selectedToken.symbol} for BSV</span>
-            <ArrowRight size={16} />
-          </>
         )}
-      </button>
 
-      {/* Warning */}
-      <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
-        <div className="flex items-start space-x-2">
-          <AlertCircle className="text-yellow-400 mt-0.5" size={16} />
-          <div className="text-yellow-400 text-sm">
-            <strong>Warning:</strong> Token burning is irreversible. Make sure you have the correct BSV address before proceeding.
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-center space-x-2">
+            <AlertCircle className="text-red-400" size={16} />
+            <span className="text-red-400">{error}</span>
+          </div>
+        )}
+
+        {/* Burn Button */}
+        <button
+          onClick={handleBurn}
+          disabled={isProcessing || !amount || !bsvAddress}
+          className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2"
+        >
+          {isProcessing ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Processing...</span>
+            </>
+          ) : (
+            <>
+              <Flame size={16} />
+              <span>Burn {selectedToken.symbol} for BSV</span>
+              <ArrowRight size={16} />
+            </>
+          )}
+        </button>
+
+        {/* Warning */}
+        <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="text-yellow-400 mt-0.5" size={16} />
+            <div className="text-yellow-400 text-sm">
+              <strong>Warning:</strong> Token burning is irreversible. Make sure you have the correct BSV address before proceeding.
+            </div>
           </div>
         </div>
       </div>

@@ -5,9 +5,13 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-1">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">BSV</span>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12">
+                <img 
+                  src="/bsvex/logo.jpg" 
+                  alt="BSV Exchange Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
               <span className="text-white font-bold text-xl">Exchange</span>
             </div>

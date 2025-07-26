@@ -28,7 +28,7 @@ const EXCHANGE_RATES = {
 export async function POST(request: NextRequest) {
   try {
     const body: BurnRequest = await request.json();
-    const { token, amount, bsvAddress, userAddress, burnTxHash } = body;
+    const { token, amount, bsvAddress, userAddress } = body;
 
     // Validate input
     if (!token || !amount || !bsvAddress || !userAddress) {

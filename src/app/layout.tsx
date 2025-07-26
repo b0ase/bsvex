@@ -9,12 +9,16 @@ export const metadata: Metadata = {
   description: "Exchange your L1 tokens (ETH, SOL, AVAX, TRX, BTC) for BSV through secure token burning",
   keywords: "BSV, Bitcoin SV, exchange, token burning, cryptocurrency, blockchain",
   authors: [{ name: "BSV Exchange Team" }],
-  viewport: "width=device-width, initial-scale=1",
   icons: {
     icon: "/bsvex/logo.jpg",
     shortcut: "/bsvex/logo.jpg",
     apple: "/bsvex/logo.jpg",
   },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({

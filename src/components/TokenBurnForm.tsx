@@ -95,7 +95,7 @@ export function TokenBurnForm() {
       setAmount("");
       setBsvAddress("");
       alert("Token burn successful! BSV will be issued to your address.");
-    } catch (err) {
+    } catch (_err) {
       setError("Failed to process burn transaction. Please try again.");
     } finally {
       setIsProcessing(false);

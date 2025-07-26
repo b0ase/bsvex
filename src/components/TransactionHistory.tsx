@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Filter, Download, Eye } from "lucide-react";
+import { Search, Download, Eye } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -61,7 +61,7 @@ const mockTransactions: Transaction[] = [
 ];
 
 export function TransactionHistory() {
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
+  const [transactions] = useState<Transaction[]>(mockTransactions);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 

@@ -1,5 +1,5 @@
 import Web3 from "web3";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 import TronWeb from "tronweb";
 
 export interface BurnResult {
@@ -55,7 +55,7 @@ export class BlockchainService {
 
       return {
         success: true,
-        transactionHash: receipt.transactionHash
+        transactionHash: receipt.transactionHash.toString()
       };
     } catch (error) {
       return {
@@ -67,10 +67,10 @@ export class BlockchainService {
   }
 
   async burnSolanaToken(
-    fromAddress: string,
-    amount: string,
-    burnAddress: string,
-    privateKey: string
+    _fromAddress: string,
+    _amount: string,
+    _burnAddress: string,
+    _privateKey: string
   ): Promise<BurnResult> {
     try {
       // Solana token burning implementation
@@ -109,10 +109,10 @@ export class BlockchainService {
   }
 
   async burnTronToken(
-    fromAddress: string,
-    amount: string,
-    burnAddress: string,
-    privateKey: string
+    _fromAddress: string,
+    _amount: string,
+    _burnAddress: string,
+    _privateKey: string
   ): Promise<BurnResult> {
     try {
       // Tron token burning implementation
@@ -133,10 +133,10 @@ export class BlockchainService {
   }
 
   async burnBitcoin(
-    fromAddress: string,
-    amount: string,
-    burnAddress: string,
-    privateKey: string
+    _fromAddress: string,
+    _amount: string,
+    _burnAddress: string,
+    _privateKey: string
   ): Promise<BurnResult> {
     try {
       // Bitcoin burning implementation
@@ -157,8 +157,8 @@ export class BlockchainService {
   }
 
   async issueBSV(
-    toAddress: string,
-    amount: string
+    _toAddress: string,
+    _amount: string
   ): Promise<BurnResult> {
     try {
       // BSV issuance implementation

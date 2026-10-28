@@ -15,7 +15,7 @@ function swap(tip: Tip, satsIn: bigint) {
         [{ script: transferScript(TOKEN_ID, out, p2pkh(t.pkh)), sats: 1n }, { script: p2pkh(PROTOCOL_PKH), sats: fee }],
         [{ script: p2pkh(t.pkh), sats: 5_000n }],
         (n) => { n.sats += satsIn - fee; n.tokens -= out },
-        (self, change) => self.swapSatsForTokens(satsIn, out, t.pkh, change))
+        (self, change) => self.trade(0n, satsIn, out, 0n, t.pkh, toByteString(''), 0n, change))
     if (!b.ok) throw new Error(JSON.stringify(b.results))
     return { tx: b.tx, pool: b.next }
 }

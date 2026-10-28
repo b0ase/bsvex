@@ -31,14 +31,15 @@ export const INDEX_FEE_PER_TOKEN_OUTPUT_SATS = 1_000n
 
 /**
  * Measured tx sizes (bytes) from contracts/scrypt/measurements.json
- * (scrypt-ts 1.4.5 / scryptc 1.20.0, Phase C). Update when the contract changes.
+ * (scrypt-ts 1.4.5 / scryptc 1.20.0, Phase D shrink; Phase C was ~50.6-51.2 kB).
+ * Update when the contract changes.
  */
 export const MEASURED_TX_BYTES = {
-  swapSatsForTokens: 50_581,
-  swapTokensForSats: 51_073,
-  addLiquidity: 51_194,
-  removeLiquidity: 51_229,
-  poolGenesis: 24_702,
+  swapSatsForTokens: 26_414,
+  swapTokensForSats: 26_899,
+  addLiquidity: 27_020,
+  removeLiquidity: 27_055,
+  poolGenesis: 12_617,
 } as const
 export type PoolOp = keyof typeof MEASURED_TX_BYTES
 

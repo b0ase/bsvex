@@ -6,8 +6,8 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { bsv, ByteString, PubKeyHash, toByteString, Utils, FixedArray, hash160 } from 'scrypt-ts'
-import { AmmPool, MAX_TOKEN_INPUTS } from '../src/contracts/ammPool'
+import { bsv, ByteString, PubKeyHash, toByteString, Utils, hash160 } from 'scrypt-ts'
+import { AmmPool } from '../src/contracts/ammPool'
 import { Vault } from '../src/contracts/vault'
 import { Bsv21 } from '../src/contracts/bsv21'
 
@@ -118,12 +118,6 @@ export interface Built {
     jsError?: string
 }
 
-const pad = <T>(xs: T[], fill: T): FixedArray<T, typeof MAX_TOKEN_INPUTS> => {
-    const out = [...xs]
-    while (out.length < MAX_TOKEN_INPUTS) out.push(fill)
-    return out as FixedArray<T, typeof MAX_TOKEN_INPUTS>
-}
-
 /**
  * Build a pool spend: inputs [pool, tokenVault, lpVault, ...trader], outputs
  * [pool', vaults', ...payouts, ...change]. `call` receives the pool instance
@@ -192,4 +186,3 @@ export function spend(
     return { tx, next, results, ok: !jsError && results.every((r) => r.success), jsError }
 }
 
-export { pad }

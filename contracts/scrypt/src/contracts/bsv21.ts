@@ -5,17 +5,23 @@
  *   (`{"p":"bsv-20","op":"transfer","id":"<id>","amt":"<n>"}`) followed by a
  *   locking script.
  * - outputScript: walk a raw parent transaction and return the locking script
- *   of output `vout` (bounded loops, see MAX_PARENT_*).
+ *   of output `vout` (bounded loops, see MAX_PARENT_INPUTS / MAX_PARENT_VOUT).
  * - isTransfer: check that a locking script carries a transfer of exactly
  *   `amt` of token `id` (caller states amt; script rebuilds and compares).
  *
- * Phase C (28 Oct 2026). Not audited. See docs/amm-design.md §12.
+ * Phase C/D (28 Oct 2026). Not audited. See docs/amm-design.md §12.
  */
 import { assert, ByteString, int2ByteString, len, method, prop, slice, SmartContractLib, toByteString, Utils } from 'scrypt-ts'
 
-/** Parent txs with more inputs/outputs than this cannot be used as token inputs. */
-export const MAX_PARENT_INPUTS = 6
-export const MAX_PARENT_OUTPUTS = 6
+/**
+ * Token-input parent tx bounds (Phase D, tightened from 6 x 6). A pool tx has
+ * 3 contract inputs + trader funding and puts the trader's token payout at
+ * output 3, so a payout can be traded straight back if the pool tx that
+ * created it had at most MAX_PARENT_INPUTS inputs. Otherwise the trader
+ * merges (self-sends) first, which they must do anyway to get one input.
+ */
+export const MAX_PARENT_INPUTS = 5
+export const MAX_PARENT_VOUT = 3
 /** Max decimal digits in a BSV-21 amt (u64 max is 20 digits). */
 export const MAX_DIGITS = 20
 
@@ -26,23 +32,23 @@ export class Bsv21 extends SmartContractLib {
     @prop() static readonly OP_ENDIF: ByteString = toByteString('68')
     @prop() static readonly P2PKH_HEAD: ByteString = toByteString('76a914')
 
-    /** Decimal ASCII for a non-negative int (no leading zeros). */
+    /**
+     * Decimal ASCII for a positive int (no leading zeros). Every amount the
+     * contract writes or checks is > 0, so 0 is refused; that drops the
+     * "done" flag and makes each of the MAX_DIGITS unrolled steps smaller.
+     */
     @method()
     static int2Ascii(n: bigint): ByteString {
-        assert(n >= 0n, 'negative amt')
+        assert(n > 0n, 'amt must be > 0')
         let out = toByteString('')
         let m = n
-        let done = false
         for (let i = 0n; i < MAX_DIGITS; i++) {
-            if (!done) {
+            if (m > 0n) {
                 out = int2ByteString((m % 10n) + 48n, 1n) + out
                 m = m / 10n
-                if (m == 0n) {
-                    done = true
-                }
             }
         }
-        assert(done, 'amt too large')
+        assert(m == 0n, 'amt too large')
         return out
     }
 
@@ -85,68 +91,55 @@ export class Bsv21 extends SmartContractLib {
         return Utils.buildOutput(Bsv21.inscription(id, amt) + lock, 1n)
     }
 
-    /** Value of a Bitcoin varint at `pos`. */
+    /**
+     * Position just after the varint-prefixed field at `pos` (varint + data).
+     * 1- and 3-byte varints only (fields under 64 kB); a 0xfe/0xff prefix fails.
+     */
     @method()
-    static varIntValue(tx: ByteString, pos: bigint): bigint {
+    static skipVarField(tx: ByteString, pos: bigint): bigint {
         const b = Utils.fromLEUnsigned(slice(tx, pos, pos + 1n))
-        let v = b
+        let end = pos + 1n + b
         if (b == 0xfdn) {
-            v = Utils.fromLEUnsigned(slice(tx, pos + 1n, pos + 3n))
-        } else if (b == 0xfen) {
-            v = Utils.fromLEUnsigned(slice(tx, pos + 1n, pos + 5n))
+            end = pos + 3n + Utils.fromLEUnsigned(slice(tx, pos + 1n, pos + 3n))
         } else {
-            assert(b < 0xffn, 'varint too big')
+            assert(b < 0xfdn, 'varint too big')
         }
-        return v
-    }
-
-    /** Size in bytes of the varint at `pos`. */
-    @method()
-    static varIntSize(tx: ByteString, pos: bigint): bigint {
-        const b = Utils.fromLEUnsigned(slice(tx, pos, pos + 1n))
-        let s = 1n
-        if (b == 0xfdn) {
-            s = 3n
-        } else if (b == 0xfen) {
-            s = 5n
-        }
-        return s
+        return end
     }
 
     /**
      * Locking script of output `vout` of raw tx `tx`. Walks the canonical
      * serialisation from the start, so a caller cannot point it at bytes that
      * are not really that output (e.g. inside an unlocking script).
+     * Bounds (Phase D): at most MAX_PARENT_INPUTS inputs and vout at most
+     * MAX_PARENT_VOUT. vout < nOut needs no check: vout comes from a real
+     * outpoint of the spending tx, so consensus already guarantees it.
      */
     @method()
     static outputScript(tx: ByteString, vout: bigint): ByteString {
-        let pos = 4n // nVersion
-        const nIn = Utils.fromLEUnsigned(slice(tx, pos, pos + 1n))
+        const nIn = Utils.fromLEUnsigned(slice(tx, 4n, 5n))
         assert(nIn > 0n && nIn <= MAX_PARENT_INPUTS, 'parent: too many inputs')
-        pos += 1n
+        assert(vout <= MAX_PARENT_VOUT, 'parent: vout too high')
+        let pos = 5n
         for (let i = 0n; i < MAX_PARENT_INPUTS; i++) {
             if (i < nIn) {
-                pos += 36n // outpoint
-                const l = Bsv21.varIntValue(tx, pos)
-                pos += Bsv21.varIntSize(tx, pos) + l + 4n // script + nSequence
+                pos = Bsv21.skipVarField(tx, pos + 36n) + 4n // outpoint, script, nSequence
             }
         }
-        const nOut = Utils.fromLEUnsigned(slice(tx, pos, pos + 1n))
-        assert(vout >= 0n && vout < nOut && nOut <= MAX_PARENT_OUTPUTS, 'parent: bad vout')
-        pos += 1n
-        let script = toByteString('')
-        for (let i = 0n; i < MAX_PARENT_OUTPUTS; i++) {
-            if (i <= vout) {
-                pos += 8n // satoshis
-                const l = Bsv21.varIntValue(tx, pos)
-                const s = Bsv21.varIntSize(tx, pos)
-                if (i == vout) {
-                    script = slice(tx, pos + s, pos + s + l)
-                }
-                pos += s + l
+        assert(Utils.fromLEUnsigned(slice(tx, pos, pos + 1n)) < 0xfdn, 'parent: too many outputs')
+        pos += 1n // output count
+        for (let i = 0n; i < MAX_PARENT_VOUT; i++) {
+            if (i < vout) {
+                pos = Bsv21.skipVarField(tx, pos + 8n)
             }
         }
-        return script
+        pos += 8n // satoshis
+        const end = Bsv21.skipVarField(tx, pos)
+        let hdr = 1n
+        if (slice(tx, pos, pos + 1n) == toByteString('fd')) {
+            hdr = 3n
+        }
+        return slice(tx, pos + hdr, end)
     }
 
     /**

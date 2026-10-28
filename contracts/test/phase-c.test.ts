@@ -22,7 +22,7 @@ describe('owner decisions 28 Oct', () => {
   it('quote includes the index fee the user pays (3 token outputs on a buy)', () => {
     const q = quoteBuy(pool(50_000_000n, 5_000_000n), 1_000_000n, 0n, 100n)
     expect(q.fixed.indexFee).toBe(3_000n)
-    expect(q.fixed.minerFee).toBe(5_059n) // 50,581 bytes at 100 sat/kB
+    expect(q.fixed.minerFee).toBe(2_642n) // 26,414 bytes at 100 sat/kB (Phase D; was 50,581)
     expect(q.totalSatsIn).toBe(1_000_000n + q.fixed.total)
   })
   it('sell quote nets out fixed costs; token change adds an index fee', () => {

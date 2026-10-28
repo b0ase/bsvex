@@ -1,7 +1,7 @@
 /**
  * Full-cost quote shown before the user signs (owner rule: real costs go into
  * prices; the user pays the index fee). Pool maths from math.ts plus the fixed
- * per-tx costs measured in Phase C.
+ * per-tx costs measured in Phase D (contracts/scrypt/measurements.json).
  */
 import * as m from './math.js'
 import { INDEX_FEE_PER_TOKEN_OUTPUT_SATS, MEASURED_TX_BYTES, POOL_CAP_SATS, PoolOp, TOKEN_OUTPUTS } from './config.js'

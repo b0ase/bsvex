@@ -1,0 +1,28 @@
+{
+  "name": "@bsvex/amm-scrypt",
+  "version": "0.0.1",
+  "private": true,
+  "description": "BSVEX AMM sCrypt contracts: compiled with pinned scrypt-ts 1.4.5 / scryptc 1.20.0, tested on the local provider only (no network)",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "scripts": {
+    "compiler": "node scripts/get-compiler.cjs",
+    "compile": "node scripts/get-compiler.cjs && scrypt-cli compile",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm compile && TS_NODE_TRANSPILE_ONLY=1 mocha"
+  },
+  "dependencies": {
+    "scrypt-ord": "1.0.17",
+    "scrypt-ts": "1.4.5"
+  },
+  "devDependencies": {
+    "@types/chai": "4.3.20",
+    "@types/mocha": "10.0.9",
+    "@types/node": "20.19.43",
+    "chai": "4.5.0",
+    "mocha": "10.7.3",
+    "scrypt-cli": "0.2.3",
+    "ts-node": "10.9.2",
+    "ts-patch": "3.0.1",
+    "typescript": "5.3.3"
+  }
+}

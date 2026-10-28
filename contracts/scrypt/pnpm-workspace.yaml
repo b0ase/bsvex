@@ -1,0 +1,4 @@
+allowBuilds:
+  scryptlib: true
+  bigint-buffer: true
+  scrypt-ts-transpiler: true

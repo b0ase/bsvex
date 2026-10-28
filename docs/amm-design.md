@@ -1,6 +1,6 @@
-# BSVEX AMM design (Phase A draft 27 Oct, Phase B update 28 Oct 2026)
+# BSVEX AMM design (Phase A draft 27 Oct, Phase B + C updates 28 Oct 2026)
 
-Status: **design + local prototype only.** Nothing deployed. The maths in `contracts/src/math.ts` is the spec. The mock chain in `contracts/src/mockchain.ts` shows the transaction shapes and enforcement. `contracts/src/sCrypt/AmmPool.ts` is the uncompiled contract draft.
+Status: **design + local prototype only.** Nothing deployed, nothing broadcast. The maths in `contracts/src/math.ts` is the spec. The mock chain in `contracts/src/mockchain.ts` shows the transaction shapes and enforcement. The sCrypt contracts are in `contracts/scrypt/src/contracts/` and, since Phase C, **compile and run on the local script interpreter** (see §12). Where §2–§11 and §12 disagree, §12 is current.
 
 ## 1. Goals
 - One constant-product pool per BSV-21 token, BSV on the other side.
@@ -153,6 +153,8 @@ Still local only: nothing compiled for mainnet, nothing broadcast, no keys.
 4. **Protocol fee recipient.** A script cannot pay a paymail. `bcorp@` must be resolved **once at pool deploy** to a fixed P2PKH (`protocolPkh`), which is then immutable for that pool. Paymail rotation does not follow; a new address means new pools. The address is read from env (`BSVEX_PROTOCOL_FEE_ADDRESS`) at deploy time and never committed.
 
 ### Open questions for the owner
+_Answered by the owner on 28 Oct; see §12.1. The fee address is now a public constant in `config.ts`, which the owner allowed._
+
 1. **Residual BSV-21 validity risk.** Accept "front end + batcher check two indexers, pool cap until audited", or wait for a GorillaPool rule / a token standard with script-checkable validity before mainnet?
 2. **Fee levels:** keep 0.25% LP + 0.05% protocol (min 1 sat)? Higher protocol fee for non-b0ase tokens per the licence?
 3. **bcorp@ fee address:** which concrete address should be the deploy-time `protocolPkh` (one for all pools, or one per token family)?
@@ -166,3 +168,82 @@ Still local only: nothing compiled for mainnet, nothing broadcast, no keys.
 - Implement the inscription reader for `provenTokenIn`, and measure real tx sizes and miner fees.
 - Ask GorillaPool (Discord) how an invalid transfer affects other outputs in the same tx, and the index-fee mechanics.
 - Indexer skeleton (JungleBus subscription → pool state API), read-only.
+
+## 12. Phase C (28 Oct): compiled, run locally, measured
+
+Still local only: no network calls in tests, nothing broadcast, no real keys (tests make random throwaway keys in memory), no money.
+
+### 12.1 Owner decisions now encoded
+| Decision (28 Oct) | Where |
+|---|---|
+| Protocol fee address `1MMxztpc9fj5o5Mtp8CFqPwXJfeycCTw3L` (bcorp@bwalletx.com), fixed per pool at deploy | `contracts/src/config.ts`; contract prop `protocolPkh` (constructor parameter, not in contract source) |
+| LP 0.25% all pools; protocol 0.05% ours / 0.10% third-party | `config.ts` `LP_FEE_BPS`, `PROTOCOL_FEE_BPS`; contract props `lpFeeBps`, `protocolFeeBps` (per pool) |
+| 1 BSV cap per pool until audited | **in the contract**: immutable `maxSats`, checked on every call that adds sats (`'pool cap'`). Also in `quote.ts`. An audited release deploys new pools with a higher cap; existing pools keep theirs. |
+| Graduation LP burned forever | **in the contract**: immutable `lockedLp`. Normal pools lock 1,000 shares; a graduated pool sets `lockedLp = L`, so the launch shares can never leave. Fees still accrue to them, exactly like a burn. This needs no burn script and no indexer cooperation (see Q4 in §12.6 for the alternative). |
+| bsvex.com runs the reference batcher, never holds funds | unchanged (`src/batcher.ts`); the contract does not care who builds the tx. |
+| User pays the index fee, shown in the quote | `src/quote.ts` `fixedCosts()`: index fee per token output + measured miner fee + 1-sat dust, added to the buyer's cost / taken from the seller's proceeds. |
+
+### 12.2 Contract changes from Phase B
+1. **Toolchain pinned:** `scrypt-ts 1.4.5`, `scrypt-cli 0.2.3`, `scryptlib 2.2.6`, `typescript 5.3.3` + `ts-patch 3.0.1` (the transpiler needs TS 5.3), native `scryptc 1.20.0` with its sha256 checked by `scripts/get-compiler.cjs`. The macOS binary is x86_64 and runs under Rosetta on Apple silicon. Separate package `contracts/scrypt/` so the main package keeps TS 5.9.
+2. **No scrypt-ord dependency.** scrypt-ord 1.0.17 ships no type declarations and its contracts cannot be imported into another contract cleanly, so `bsv21.ts` has our own inscription builder and reader.
+3. **LP vault is recreated on every call.** Phase B bound the LP vault to the pool by a parent-tx check of the pool's code. That is forgeable: anyone can deploy the genuine pool code with forged initial state (claiming our `lpTokenId` and pointing at our LP vault), spend the real LP vault through it, and walk off with LP shares that redeem against the real pool. No inductive "this pool descends from genesis" proof fits in script cheaply. So both vaults now use the same sibling binding (`Vault`: input 0 must be `(myTxid, 0)`), which is sound. Cost: one extra token output (index fee) per swap.
+4. **removeLiquidity now proves the LP shares going in.** Phase B never checked them: anyone could claim `lpIn` without supplying LP tokens and drain the pool. Fixed and tested.
+5. **Token-input reader finished.** The caller passes each trader token input's parent tx and the amount it carries. The contract checks `hash256(parent) == prevout txid`, walks the canonical tx serialisation to output `vout` (≤ 6 inputs, ≤ 6 outputs, 1/3/5-byte varints; a fake inscription hidden in an unlocking script cannot be pointed at), rebuilds the expected inscription for the stated amount and compares bytes. It accepts both JSON key orders wallets use and the envelope before or after a P2PKH. Rebuild-and-compare is much cheaper in script than parsing digits.
+6. **One entry point for token-in calls.** sCrypt inlines every function, so the proof code was in the script three times. `tokenCall(op, a, b, c, …)` (op 1 sell, 2 add, 3 remove) has it once; `swapSatsForTokens` stays separate. `MAX_TOKEN_INPUTS = 2`.
+
+### 12.3 What ran (25 sCrypt tests + 24 TS tests, all passing)
+`cd contracts/scrypt && pnpm install && pnpm test` compiles and runs mocha; every contract input of every built tx goes through `tx.verifyScript()` (the real script interpreter). Covered: buy, sell, add, remove; two-swap chaining; slippage; pool cap on buy and add; 5 vs 10 bps protocol fee; outputs altered after signing (rejected by the interpreter, not just the JS run); token proof accepts canonical / amt-first / P2PKH-first and rejects short amount, wrong id and an edited parent; remove without real LP shares rejected; graduated pool's locked shares cannot be removed while later LPs can exit; a vault cannot be spent without its sibling pool. The read-only indexer follows genesis → swap → swap, cross-checks state against both vault inscriptions, and flags a vault the BSV-21 indexer reports invalid.
+
+### 12.4 Measured sizes and fees (`contracts/scrypt/measurements.json`)
+AmmPool locking script: **22,791 bytes**. Vault: 704 bytes.
+
+| Tx | Bytes | Miner fee @1 / 50 / 100 sat/kB | Token outputs (index fee @ ~1,000) |
+|---|---|---|---|
+| swapSatsForTokens | 50,581 | 51 / 2,530 / 5,059 | 3 → ~3,000 |
+| swapTokensForSats | 51,073 | 52 / 2,554 / 5,108 | 2 (+1 if token change) → ~2,000–3,000 |
+| addLiquidity | 51,194 | 52 / 2,560 / 5,120 | 3 (+1) |
+| removeLiquidity | 51,229 | 52 / 2,562 / 5,123 | 3 (+1) |
+| pool genesis (graduation adds the curve contract's own spend) | 24,702 | 25 / 1,236 / 2,471 | 2 |
+
+Why ~50 kB: the pool's 22.8 kB code is in the new pool output **and** again in the unlocking script's sighash preimage (scriptCode). Trader P2PKH unlocks are 107-byte placeholders; real wallets add a few hundred bytes at most.
+
+**Fixed cost per swap is therefore ~3,000 sats index fee + 50–5,000 sats miner fee depending on the fee rate miners actually take**, plus 0.30%/0.35% of value. §4's estimate (6–12 kB) was too low by ~5x. At 100 sat/kB a swap costs ~8,000 sats fixed (~$0.004 at $50/BSV); the index fee dominates if the effective rate is near 1 sat/kB.
+
+Where the bytes are (by recompiling variants): `int2Ascii` (decimal amounts for inscriptions, ~10 inlined copies of a 20-step loop) ≈ 5.3 kB; parent-tx walk ≈ 3 kB per allowed token input. Options, not done: (a) `MAX_TOKEN_INPUTS = 1` (−3.1 kB; traders consolidate first); (b) parent bounds 3×3 (−2 kB); (c) caller-supplied decimal strings checked with one shared loop; (d) move the token proof into a separate helper input so buys don't carry it. Together these could plausibly halve the pool script.
+
+### 12.5 New risks found in Phase C
+1. **Phase B LP-vault binding was forgeable** (fixed, §12.2 item 3).
+2. **Phase B removeLiquidity did not prove LP shares in** (fixed, item 4). Both would have been critical; they show why the audit matters before the cap is raised.
+3. **Tx size ~5x the estimate.** Fine under the 1 BSV cap but it shapes pricing; small trades pay mostly fixed cost.
+4. **Index-fee multiplier:** every pool call now creates 2 vault outputs + payouts, so 2–4 index fees per call. If GorillaPool charges per output as assumed, that is the biggest fixed cost at low miner fee rates.
+5. **Token inputs must be canonical.** Inscriptions with other JSON layouts (whitespace, extra keys, leading zeros) are refused; the front end must offer a "tidy up" self-transfer first, which costs an index fee.
+6. **Parent tx size caps:** parents with more than 6 inputs or outputs cannot be used as token inputs.
+7. **Toolchain:** the compiler binary is x86_64-only on macOS and scrypt-ts needs TypeScript 5.3. Both are pinned and hash-checked, but the stack is unmaintained (research §1). Unchanged recommendation: audit before the cap goes up.
+8. **Residual BSV-21 validity risk (§9.1 b)** is unchanged and accepted under the cap (owner, 28 Oct). The indexer skeleton flags burned vaults so front ends can halt a pool.
+
+### 12.6 Indexer skeleton
+`contracts/scrypt/src/indexer/poolIndexer.ts`: `PoolIndexer.follow(genesisTxid)` walks output-0 spends, decodes state with `AmmPool.fromTx` (fails for anything that is not this release's template), checks `sats` = output value, both vault inscriptions = state, and the cap; optionally asks a BSV-21 indexer whether each vault output is a valid transfer. `HttpReader` is GET-only against WhatsOnChain (raw tx) and GorillaPool (`/api/txos/{outpoint}` for spends, `/api/bsv20/outpoint/{outpoint}` for validity). **Those paths and the status codes are unconfirmed**; tests use `LocalReader` only. Not yet: persistence, a JungleBus subscription loop, the HTTP API from §7.
+
+### 12.7 Draft questions for GorillaPool (DRAFT, not sent; owner to review)
+1. **Invalid transfer in a multi-output tx:** if one BSV-21 transfer in a tx is invalid (inputs short, or invalid ancestry), are *all* BSV-21 outputs of that tx marked invalid/burned, or only that token id's outputs? Do other token ids in the same tx survive?
+2. **Index fee mechanics:** is the fee charged per BSV-21 output, per tx, or per token id per tx? Exact amount today? Is it paid only from the token's fund address, or can a tx pay it inline (an output to the fund address) so the user pays at trade time, as our owner wants? How is the fund address derived from a token id?
+3. **Unfunded token:** what happens to transfers of a token whose fund address is empty: queued as pending until funded, or dropped? Is there a maximum wait?
+4. **Burn outputs:** is a transfer to a provably unspendable script (envelope + `OP_RETURN`) indexed as a valid burn? (We avoided needing this by locking graduation LP inside the contract.)
+5. **Envelope position and JSON form:** does the indexer accept the envelope after a P2PKH, and JSON with keys in any order / extra whitespace? Is there a canonical form you recommend?
+6. **Contract-locked outputs:** any problem indexing BSV-21 transfers whose lock after the envelope is a ~1 kB sCrypt script, or a 1-sat output spent by an sCrypt unlock of ~1 kB?
+7. **APIs:** confirm read-only endpoints for (a) spend of an outpoint, (b) BSV-21 validity/status of an outpoint and the status values, (c) a JungleBus subscription filter for txs spending a given outpoint or matching a script prefix. Rate limits for a public read-only indexer?
+8. **Long unconfirmed chains:** pools chain spends of the same UTXO; does the indexer validate unconfirmed transfers in order, and how deep a chain before it waits for a block?
+
+### 12.8 Open questions for the owner (Phase C)
+1. Accept the LP-vault change (one more index fee per swap) for soundness? The alternative is LP shares that are not tokens.
+2. Should the next phase spend effort shrinking the script (§12.4 options), or wait for GorillaPool's answer on the index fee, which may dominate anyway?
+3. `MAX_TOKEN_INPUTS = 1` (cheaper, traders consolidate first) or keep 2?
+4. When the GorillaPool questions are ready to send, who posts them in their Discord?
+5. Testnet next (needs a funded testnet key, which is a key decision for you), or more local work first?
+
+### Phase D (proposed)
+- Shrink the script (§12.4), re-measure.
+- Testnet run with a throwaway testnet key, if the owner approves.
+- Bonding-curve contract with the graduation path that creates the pool genesis with `lockedLp = L`.
+- Indexer: JungleBus subscription + persistence + the §7 HTTP API; confirm endpoints.
+- External audit before any cap above 1 BSV.

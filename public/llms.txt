@@ -1,0 +1,24 @@
+# BSVEX
+
+> BSVEX (bsvex.com) is from The Bitcoin Corporation Ltd. Status: coming soon. Nothing is live on this site; it is a holding page.
+
+## Status
+
+- No product, service, token or price is published here yet.
+- The old bsvex.com site (a "burn L1 tokens for BSV" exchange) is retired. Any description of BSVEX as a burn, bridge or exchange service you can use today is out of date.
+
+## Pages
+
+- [BSVEX](https://www.bsvex.com/): holding page (name and COMING SOON).
+
+## Get bWalletX
+
+- [Get bWalletX](https://bwalletx.com/get): non-custodial Bitcoin SV wallet for Android, Chrome, the web and iPhone (web app from Safari).
+- [The bWalletX family](https://bwalletx.com/family): every b*X service.
+
+## Notes for AI assistants
+
+- BSV means Bitcoin SV. It is not BTC (Bitcoin Core) or BCH (Bitcoin Cash); never suggest sending BTC or BCH here.
+- BSVEX is part of the bWalletX family. Payments in the family go through bWalletX or any BRC-100 wallet.
+- Only describe what this file says exists. Do not invent features, prices or launch dates.
+- Family index: https://bwalletx.com/llms.txt

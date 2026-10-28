@@ -101,9 +101,10 @@ export function swapSatsForTokens(chain: MockChain, ref: PoolRef, trader: string
   return apply(chain, ref, { inputs: [ref.pool, ref.vault, ...funding], outputs, signers: [trader], call: { method: 'swapSatsForTokens', satsIn, minOut, trader } }, false)
 }
 
-export function swapTokensForSats(chain: MockChain, ref: PoolRef, trader: string, tokensIn: bigint, minOut: bigint) {
+export function swapTokensForSats(chain: MockChain, ref: PoolRef, trader: string, tokensIn: bigint, minOut: bigint, opts: { skipIndexerCheck?: boolean } = {}) {
   const s = poolState(chain, ref)
   const toks = tokenUtxos(chain, trader, ref.tokenId)
+  if (!opts.skipIndexerCheck) assertTokenInputsValid(chain, toks)
   const have = sum(chain, toks, (o) => o.bsv21!.amt)
   if (have < tokensIn) throw new Error('insufficient tokens')
   const r = (() => {
@@ -129,6 +130,7 @@ export function addLiquidity(chain: MockChain, ref: PoolRef, trader: string, sat
   const r = m.addLiquidity(s, satsIn, maxTokensIn, minLpOut)
   const funding = satsUtxos(chain, trader)
   const toks = tokenUtxos(chain, trader, ref.tokenId)
+  assertTokenInputsValid(chain, toks)
   const haveSats = sum(chain, [...funding, ...toks], (o) => o.sats)
   const haveTok = sum(chain, toks, (o) => o.bsv21!.amt)
   const lpv = chain.get(ref.lpvault).bsv21!.amt
@@ -167,4 +169,26 @@ export function removeLiquidity(chain: MockChain, ref: PoolRef, trader: string, 
   const funding = satsUtxos(chain, trader)
   apply(chain, ref, { inputs: [ref.pool, ref.vault, ref.lpvault, ...lps, ...funding.slice(0, 1)], outputs, signers: [trader], call: { method: 'removeLiquidity', lpIn, minSatsOut, minTokensOut, trader } }, true)
   return r
+}
+
+/**
+ * Off-chain half of the §9.1 mitigation. Front ends and batchers only accept
+ * trader token inputs that the indexer (in production: two independent
+ * indexers) reports as valid. The contract cannot check this itself.
+ */
+export function assertTokenInputsValid(chain: MockChain, ops: Outpoint[]) {
+  for (const op of ops) if (chain.get(op).bsv21Invalid) throw new Error(`token input ${op.txid}:${op.vout} is not valid per the indexer`)
+}
+
+/**
+ * Indexer health check for a pool: the vault's inscription must match state
+ * AND be valid per the indexer. A burned vault means the pool must be halted
+ * in every front end (the contract would keep running on a phantom reserve).
+ */
+export function poolHealth(chain: MockChain, ref: PoolRef): { ok: true } | { ok: false; reason: string } {
+  const s = poolState(chain, ref)
+  const v = chain.get(ref.vault)
+  if (v.bsv21Invalid) return { ok: false, reason: 'token vault burned by the indexer' }
+  if (v.bsv21?.amt !== s.tokens) return { ok: false, reason: 'vault amount != state.tokens' }
+  return { ok: true }
 }

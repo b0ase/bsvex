@@ -1,4 +1,4 @@
-# BSVEX AMM design (Phase A draft, 27 Oct 2026)
+# BSVEX AMM design (Phase A draft 27 Oct, Phase B update 28 Oct 2026)
 
 Status: **design + local prototype only.** Nothing deployed. The maths in `contracts/src/math.ts` is the spec. The mock chain in `contracts/src/mockchain.ts` shows the transaction shapes and enforcement. `contracts/src/sCrypt/AmmPool.ts` is the uncompiled contract draft.
 
@@ -143,5 +143,26 @@ The contract is permissionless, so screening happens where bsvex.com software ac
   - on-chain trades are already their own audit trail.
 - **Regulatory open question:** BSVEX-PLAN / TERRORNODE §9 flag that running a P2P matching service for a fee may be "cryptoasset exchange provider" activity in the UK. A batcher plus protocol fee may fall in scope. That is the solicitor's question, not this document's. The engineering keeps the protocol fee address, batcher and front end separable, so whatever is decided can be applied without changing the contract.
 
-## 11. Phase B checklist
-See the PR description and README.
+## 11. Phase B (28 Oct): what changed
+
+Still local only: nothing compiled for mainnet, nothing broadcast, no keys.
+
+1. **Token-input proof (§9.1 part a), modelled and tested.** `validatePoolSpend` now requires the trader's token inputs (from index 2 on swaps, 3 on adds) to carry transfer inscriptions with the pool's token id summing to at least `tokensIn`. In sCrypt this is `provenTokenIn` (sketch in `AmmPool.ts`): the caller passes each token input's parent tx, the contract checks `hash256(parent)` against the prevout txid and parses the inscription. Tests: wrong id and under-claimed amounts are rejected by the contract.
+2. **Mainnet indexer semantics in the mock.** `new MockChain({ indexer: 'burn' })` mines a tx that breaks BSV-21 rules and marks its token outputs burned, as GorillaPool does, instead of rejecting it. This let us **demonstrate the residual risk** (§9.1 part b): an inscription that looks right but was never validly funded passes the contract, the trader gets sats, the vault burns, and later buyers receive invalid tokens. Mitigations now in code: `assertTokenInputsValid` (clients and batchers refuse indexer-invalid inputs) and `poolHealth` (front ends halt a pool whose vault is burned). This is the main reason the AMM must not launch on mainnet without a cap and an audit.
+3. **Contention, tested.** A tx built on a stale tip is rejected with nothing moved, and the loser re-quotes and fills. `src/batcher.ts` is a reference open batcher: arrival order, deadlines, min-out. One bad intent never blocks others; no custody.
+4. **Protocol fee recipient.** A script cannot pay a paymail. `bcorp@` must be resolved **once at pool deploy** to a fixed P2PKH (`protocolPkh`), which is then immutable for that pool. Paymail rotation does not follow; a new address means new pools. The address is read from env (`BSVEX_PROTOCOL_FEE_ADDRESS`) at deploy time and never committed.
+
+### Open questions for the owner
+1. **Residual BSV-21 validity risk.** Accept "front end + batcher check two indexers, pool cap until audited", or wait for a GorillaPool rule / a token standard with script-checkable validity before mainnet?
+2. **Fee levels:** keep 0.25% LP + 0.05% protocol (min 1 sat)? Higher protocol fee for non-b0ase tokens per the licence?
+3. **bcorp@ fee address:** which concrete address should be the deploy-time `protocolPkh` (one for all pools, or one per token family)?
+4. **Index fee payer:** at ~1,000 sats per token output (unconfirmed with GorillaPool), who funds each token's index fund for pool traffic: the token launcher at graduation (current design) or bCorp from protocol fees?
+5. **Graduation liquidity:** burn the launch LP shares forever (current design) or time-lock them (e.g. 1 year) to the launcher?
+6. **Batcher:** should bsvex.com run the reference batcher from day one, or start with v1 optimistic chaining only?
+7. **Audit budget and pool cap** before the first mainnet pool (e.g. max 1 BSV per pool until audited).
+
+### Phase C (next)
+- Compile `AmmPool`/`TokenVault`/`LpVault` with pinned scrypt-ts 1.4.5 and run them on the scrypt-ts local provider (no network).
+- Implement the inscription reader for `provenTokenIn`, and measure real tx sizes and miner fees.
+- Ask GorillaPool (Discord) how an invalid transfer affects other outputs in the same tx, and the index-fee mechanics.
+- Indexer skeleton (JungleBus subscription → pool state API), read-only.

@@ -17,6 +17,9 @@
  */
 import { assert, ByteString, hash256, method, prop, PubKeyHash, SmartContract, Utils, toByteString } from 'scrypt-ts'
 import { BSV20V2 } from 'scrypt-ord'
+import type { FixedArray } from 'scrypt-ts'
+
+const MAX_TOKEN_INPUTS = 4
 
 export class AmmPool extends SmartContract {
   @prop() readonly tokenId: ByteString // BSV-21 id "<txid>_<vout>" of the traded token
@@ -88,7 +91,31 @@ export class AmmPool extends SmartContract {
     assert(hash256(outputs) == this.ctx.hashOutputs, 'outputs mismatch')
   }
 
+  /**
+   * Phase B (design §9.1): prove the trader's token inputs from their parent
+   * txs. `parents` holds each token input's full parent tx; `prevouts` is the
+   * serialised outpoint list (checked against hashPrevouts). For each token
+   * input i >= firstIdx: hash256(parent_i) == prevouts[i].txid, then parse the
+   * output at prevouts[i].vout, require a BSV-21 transfer inscription with
+   * id == tokenId, and sum its amt. Sketch only: parsing uses scrypt-ord's
+   * inscription reader; loop bound MAX_TOKEN_INPUTS is a compile-time const.
+   * It cannot prove the parent was indexer-valid (residual risk, off chain).
+   */
+  @method() provenTokenIn(prevouts: ByteString, parents: FixedArray<ByteString, typeof MAX_TOKEN_INPUTS>, n: bigint, firstIdx: bigint): bigint {
+    assert(hash256(prevouts) == this.ctx.hashPrevouts, 'bad prevouts')
+    let total = 0n
+    for (let i = 0; i < MAX_TOKEN_INPUTS; i++) {
+      if (BigInt(i) < n) {
+        const op = prevouts.slice(Number((firstIdx + BigInt(i)) * 72n), Number((firstIdx + BigInt(i) + 1n) * 72n))
+        assert(hash256(parents[i]) == op.slice(0, 64), 'parent mismatch')
+        total += BSV20V2.parseTransferAmt(parents[i], op.slice(64, 72), this.tokenId) // TODO phase C: implement reader
+      }
+    }
+    return total
+  }
+
   @method() public swapTokensForSats(tokensIn: bigint, minOut: bigint, trader: PubKeyHash, change: ByteString) {
+    // Phase B: assert(this.provenTokenIn(prevouts, parents, n, 2n) >= tokensIn)
     const oldK = this.sats * this.tokens
     const gross = AmmPool.amountOut(tokensIn, this.tokens, this.sats, this.lpFeeBps)
     const pFee = this.protocolFee(gross)

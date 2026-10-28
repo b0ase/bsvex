@@ -37,7 +37,13 @@ export interface Bsv21 {
 export interface Output {
   sats: bigint
   script: Script
+  /** The BSV-21 transfer inscription on this output (what a script can read
+   *  from the parent tx). */
   bsv21?: Bsv21
+  /** Set by the indexer when the inscription is NOT backed by valid token
+   *  inputs: the tokens are burned even though the inscription is there.
+   *  Script cannot see this flag; only the indexer can. */
+  bsv21Invalid?: true
 }
 
 export interface Outpoint {
@@ -64,9 +70,20 @@ export class TxRejected extends Error {}
 
 const key = (o: Outpoint) => `${o.txid}:${o.vout}`
 
+export interface ChainOptions {
+  /**
+   * How the mock treats a tx that breaks the BSV-21 rules.
+   *  - 'reject' (default): refuse it, so ordinary tests catch mistakes.
+   *  - 'burn': what mainnet does. The tx is mined (Bitcoin and script rules
+   *    passed) but every token output in it is marked invalid (burned).
+   */
+  indexer?: 'reject' | 'burn'
+}
+
 export class MockChain {
   utxos = new Map<string, Output>()
   private n = 0
+  constructor(readonly opts: ChainOptions = {}) {}
 
   /** Create outputs from nothing (a faucet / genesis), for test setup only. */
   mint(outputs: Output[]): string {
@@ -95,11 +112,17 @@ export class MockChain {
     ins.forEach((o, idx) => this.checkScript(o, idx, tx, ins))
 
     // 3. BSV-21 indexer rules.
-    checkBsv21(ins, tx.outputs)
+    let burned = false
+    try {
+      checkBsv21(ins, tx.outputs)
+    } catch (e) {
+      if (!(e instanceof TxRejected) || this.opts.indexer !== 'burn') throw e
+      burned = true
+    }
 
     tx.inputs.forEach((i) => this.utxos.delete(key(i)))
     const txid = this.nextTxid()
-    tx.outputs.forEach((o, i) => this.utxos.set(key({ txid, vout: i }), o))
+    tx.outputs.forEach((o, i) => this.utxos.set(key({ txid, vout: i }), burned && o.bsv21 ? { ...o, bsv21Invalid: true } : o))
     return txid
   }
 
@@ -137,7 +160,7 @@ export class MockChain {
 
 export function checkBsv21(ins: Output[], outs: Output[]) {
   const bal = new Map<string, bigint>()
-  for (const o of ins) if (o.bsv21) bal.set(o.bsv21.id, (bal.get(o.bsv21.id) ?? 0n) + o.bsv21.amt)
+  for (const o of ins) if (o.bsv21 && !o.bsv21Invalid) bal.set(o.bsv21.id, (bal.get(o.bsv21.id) ?? 0n) + o.bsv21.amt)
   for (const o of outs) {
     if (!o.bsv21) continue
     if (o.sats !== 1n) throw new TxRejected('bsv21: token output must be exactly 1 sat')
@@ -185,6 +208,7 @@ export function validatePoolSpend(poolOut: Output, tx: Tx, ins: Output[]) {
         break
       }
       case 'swapTokensForSats': {
+        requireTokenInputs(ins, 2, p.tokenId, call.tokensIn)
         const r = m.swapTokensForSats(s, call.tokensIn, call.minOut)
         expected = [pool(r.next), vault(r.next.tokens), pay(call.trader, r.out), pay(p.protocolAddr, r.protocolFee)]
         break
@@ -193,6 +217,7 @@ export function validatePoolSpend(poolOut: Output, tx: Tx, ins: Output[]) {
         const lpIn = ins[2]
         if (lpIn?.script.kind !== 'lpvault' || lpIn.bsv21?.id !== p.lpTokenId) throw new TxRejected('pool: input 2 is not my lpvault')
         const r = m.addLiquidity(s, call.satsIn, call.maxTokensIn, call.minLpOut)
+        requireTokenInputs(ins, 3, p.tokenId, r.tokensIn)
         expected = [pool(r.next), vault(r.next.tokens), lpvault(lpIn.bsv21.amt - r.lpOut), tok(call.trader, p.lpTokenId, r.lpOut)]
         break
       }
@@ -217,4 +242,22 @@ export function validatePoolSpend(poolOut: Output, tx: Tx, ins: Output[]) {
   expected.forEach((o, i) => {
     if (!sameOutput(tx.outputs[i], o)) throw new TxRejected(`pool: output ${i} does not match contract`)
   })
+}
+
+/**
+ * Mitigation for design §9.1 (token-inscription mismatch). The contract is
+ * given each trader token input's parent tx, checks hash256(parent) against
+ * the input's prevout txid, and parses the transfer inscription on the spent
+ * output. Here that is modelled by reading `bsv21` (the inscription) on the
+ * inputs from `from` onward. It stops a trader from claiming more tokens, or
+ * a different token id, than the inputs carry.
+ *
+ * It CANNOT see `bsv21Invalid`: whether those inscriptions were themselves
+ * validly funded is indexer state, not script state. That residual risk is
+ * handled off chain (see client.assertTokenInputsValid and design §9.1).
+ */
+function requireTokenInputs(ins: Output[], from: number, tokenId: string, need: bigint) {
+  let have = 0n
+  for (const o of ins.slice(from)) if (o.bsv21?.id === tokenId) have += o.bsv21.amt
+  if (have < need) throw new TxRejected(`pool: token inputs carry ${have}, need ${need}`)
 }

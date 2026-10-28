@@ -34,3 +34,5 @@ next-env.d.ts
 
 # OS
 Thumbs.db 
+# AMM prototype (not part of the site build)
+contracts

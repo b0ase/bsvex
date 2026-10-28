@@ -1,0 +1,17 @@
+{
+  "name": "@bsvex/amm",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "BSVEX constant-product AMM: maths, mock chain and sCrypt contract draft (experimental, not deployed)",
+  "license": "SEE LICENSE IN ../LICENSE",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.9"
+  }
+}

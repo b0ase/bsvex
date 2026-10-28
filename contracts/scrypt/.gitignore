@@ -1,0 +1,4 @@
+node_modules/
+artifacts/
+scrypt.index.json
+tsconfig-scryptTS.json

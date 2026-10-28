@@ -1,0 +1,78 @@
+{
+  "note": "Measured locally with scrypt-ts 1.4.5 / scryptc 1.20.0. Trader P2PKH unlocks are 107-byte placeholders. Not broadcast.",
+  "poolScriptBytes": 22791,
+  "vaultScriptBytes": 704,
+  "txs": {
+    "swapSatsForTokens": {
+      "bytes": 50581,
+      "contractInputs": [
+        23164,
+        1162,
+        1174
+      ],
+      "outputs": 6,
+      "minerFeeSats": {
+        "1sat/kB": 51,
+        "50sat/kB": 2530,
+        "100sat/kB": 5059,
+        "500sat/kB": 25291
+      }
+    },
+    "swapTokensForSats": {
+      "bytes": 51073,
+      "contractInputs": [
+        23584,
+        1198,
+        1210
+      ],
+      "outputs": 6,
+      "minerFeeSats": {
+        "1sat/kB": 52,
+        "50sat/kB": 2554,
+        "100sat/kB": 5108,
+        "500sat/kB": 25537
+      }
+    },
+    "addLiquidity": {
+      "bytes": 51194,
+      "contractInputs": [
+        23590,
+        1198,
+        1210
+      ],
+      "outputs": 5,
+      "minerFeeSats": {
+        "1sat/kB": 52,
+        "50sat/kB": 2560,
+        "100sat/kB": 5120,
+        "500sat/kB": 25597
+      }
+    },
+    "removeLiquidity": {
+      "bytes": 51229,
+      "contractInputs": [
+        23591,
+        1198,
+        1210
+      ],
+      "outputs": 6,
+      "minerFeeSats": {
+        "1sat/kB": 52,
+        "50sat/kB": 2562,
+        "100sat/kB": 5123,
+        "500sat/kB": 25615
+      }
+    },
+    "poolGenesis (outputs only; graduation adds the curve spend)": {
+      "bytes": 24702,
+      "contractInputs": [],
+      "outputs": 3,
+      "minerFeeSats": {
+        "1sat/kB": 25,
+        "50sat/kB": 1236,
+        "100sat/kB": 2471,
+        "500sat/kB": 12351
+      }
+    }
+  }
+}

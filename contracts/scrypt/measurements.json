@@ -1,78 +1,89 @@
 {
-  "note": "Measured locally with scrypt-ts 1.4.5 / scryptc 1.20.0. Trader P2PKH unlocks are 107-byte placeholders. Not broadcast.",
-  "poolScriptBytes": 22791,
+  "note": "Phase D. Measured locally with scrypt-ts 1.4.5 / scryptc 1.20.0. Trader P2PKH unlocks are 107-byte placeholders. Not broadcast.",
+  "poolScriptBytes": 10706,
   "vaultScriptBytes": 704,
   "txs": {
     "swapSatsForTokens": {
-      "bytes": 50581,
+      "bytes": 26414,
       "contractInputs": [
-        23164,
+        11082,
         1162,
         1174
       ],
       "outputs": 6,
       "minerFeeSats": {
-        "1sat/kB": 51,
-        "50sat/kB": 2530,
-        "100sat/kB": 5059,
-        "500sat/kB": 25291
+        "1sat/kB": 27,
+        "50sat/kB": 1321,
+        "100sat/kB": 2642,
+        "500sat/kB": 13207
       }
     },
     "swapTokensForSats": {
-      "bytes": 51073,
+      "bytes": 26899,
       "contractInputs": [
-        23584,
+        11495,
         1198,
         1210
       ],
       "outputs": 6,
       "minerFeeSats": {
-        "1sat/kB": 52,
-        "50sat/kB": 2554,
-        "100sat/kB": 5108,
-        "500sat/kB": 25537
+        "1sat/kB": 27,
+        "50sat/kB": 1345,
+        "100sat/kB": 2690,
+        "500sat/kB": 13450
       }
     },
     "addLiquidity": {
-      "bytes": 51194,
+      "bytes": 27020,
       "contractInputs": [
-        23590,
+        11501,
         1198,
         1210
       ],
       "outputs": 5,
       "minerFeeSats": {
-        "1sat/kB": 52,
-        "50sat/kB": 2560,
-        "100sat/kB": 5120,
-        "500sat/kB": 25597
+        "1sat/kB": 28,
+        "50sat/kB": 1351,
+        "100sat/kB": 2702,
+        "500sat/kB": 13510
       }
     },
     "removeLiquidity": {
-      "bytes": 51229,
+      "bytes": 27055,
       "contractInputs": [
-        23591,
+        11502,
         1198,
         1210
       ],
       "outputs": 6,
       "minerFeeSats": {
-        "1sat/kB": 52,
-        "50sat/kB": 2562,
-        "100sat/kB": 5123,
-        "500sat/kB": 25615
+        "1sat/kB": 28,
+        "50sat/kB": 1353,
+        "100sat/kB": 2706,
+        "500sat/kB": 13528
       }
     },
     "poolGenesis (outputs only; graduation adds the curve spend)": {
-      "bytes": 24702,
+      "bytes": 12617,
       "contractInputs": [],
       "outputs": 3,
       "minerFeeSats": {
-        "1sat/kB": 25,
-        "50sat/kB": 1236,
-        "100sat/kB": 2471,
-        "500sat/kB": 12351
+        "1sat/kB": 13,
+        "50sat/kB": 631,
+        "100sat/kB": 1262,
+        "500sat/kB": 6309
       }
+    }
+  },
+  "phaseC": {
+    "poolScriptBytes": 22791,
+    "vaultScriptBytes": 704,
+    "txBytes": {
+      "swapSatsForTokens": 50581,
+      "swapTokensForSats": 51073,
+      "addLiquidity": 51194,
+      "removeLiquidity": 51229,
+      "poolGenesis": 24702
     }
   }
 }

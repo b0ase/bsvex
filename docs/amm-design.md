@@ -247,3 +247,39 @@ Where the bytes are (by recompiling variants): `int2Ascii` (decimal amounts for 
 - Bonding-curve contract with the graduation path that creates the pool genesis with `lockedLp = L`.
 - Indexer: JungleBus subscription + persistence + the §7 HTTP API; confirm endpoints.
 - External audit before any cap above 1 BSV.
+
+## 13. Phase D (28 Oct): script shrunk, one token input per trade
+
+Owner decisions (28 Oct): (1) keep the extra index fee per swap: the LP vault is still recreated with the pool on every call (the forged-vault fix stays); (2) shrink the pool script now; (3) **one token input per trade**, traders merge tokens first. Still local only: no network in tests, nothing broadcast, no real keys or funds. Same pinned toolchain (scrypt-ts 1.4.5 / scryptc 1.20.0, sha256-checked).
+
+### 13.1 What changed
+1. **One public method.** `swapSatsForTokens` and `tokenCall` are merged into `trade(op, a, b, c, trader, parent, parentAmt, change)` (op 0 buy, 1 sell, 2 add, 3 remove). sCrypt inlines everything, so the vault check, state output, both vault outputs and the payout builder were in the script twice; now once. Each op still produces a fixed output layout: `[pool', token vault', LP vault', token payout (ops 0/2/3), sats to trader (ops 1/3), protocol fee (ops 0/1), change...]`. **Remove-liquidity output order changed**: the token payout is now output 3 and the sats payout follows it (it was sats then tokens).
+2. **One token input (owner decision 3).** No arrays: `parent` is input 3's parent tx, `parentAmt` its amount. Only input 3 is credited, so a trade split across two token UTXOs fails `token inputs short`; claiming the combined amount against input 3 fails the proof. The front end/batcher must merge token UTXOs with a self-send first (one extra index fee, once).
+3. **Cheaper decimal encoder.** `int2Ascii` now refuses 0 (every amount the contract writes or checks is > 0), which drops the `done` flag: each of the 20 unrolled steps is about half the size. With the merge it is in the script 4 times instead of ~10.
+4. **Tighter parent walk.** Parent tx: at most 5 inputs (was 6) and the token output at vout 0-3 (was "≤ 6 outputs"). The output count is no longer bounded and `vout < nOut` is no longer checked: vout comes from a real outpoint of the spending tx, so consensus guarantees it. One varint routine (1- or 3-byte; fields ≥ 64 kB refused) replaces the value/size pair. The 5 x vout-3 bounds were chosen so **a buy payout (output 3 of a pool tx with ≤ 2 funding inputs) can be sold straight back** without a self-send; tested.
+5. Unchanged: sibling-bound vaults, LP vault recreated every call, removeLiquidity proves LP shares, pool cap and `lockedLp` in the contract, k check, slippage bounds, protocol fee floor of 1 sat, outputs bound by `hashOutputs`.
+
+### 13.2 Before / after (`contracts/scrypt/measurements.json`; trader unlocks are 107-byte placeholders)
+Pool locking script **22,791 → 10,706 bytes (−53%)**; compiled code alone ~9.8 kB (the rest is the immutable props, mostly the 704-byte vault code). Vault 704 bytes (unchanged).
+
+| Tx | Bytes C → D | Miner fee @1 / 50 / 100 sat/kB, C → D | Index fee (@1,000/token output) | Fixed cost per call @1 / 50 / 100 sat/kB (miner + index + 1-sat dust), C → D |
+|---|---|---|---|---|
+| buy (op 0) | 50,581 → **26,414** (−48%) | 51 / 2,530 / 5,059 → **27 / 1,321 / 2,642** | 3 outputs → 3,000 | 3,054 / 5,533 / 8,062 → **3,030 / 4,324 / 5,645** |
+| sell (op 1) | 51,073 → **26,899** (−47%) | 52 / 2,554 / 5,108 → **27 / 1,345 / 2,690** | 2 (+1 if token change) → 2,000-3,000 | 2,054 / 4,556 / 7,110 → **2,029 / 3,347 / 4,692** (no token change) |
+| add (op 2) | 51,194 → **27,020** (−47%) | 52 / 2,560 / 5,120 → **28 / 1,351 / 2,702** | 3 (+1) → 3,000 | 3,055 / 5,563 / 8,123 → **3,031 / 4,354 / 5,705** |
+| remove (op 3) | 51,229 → **27,055** (−47%) | 52 / 2,562 / 5,123 → **28 / 1,353 / 2,706** | 3 (+1) → 3,000 | 3,055 / 5,565 / 8,126 → **3,031 / 4,356 / 5,709** |
+| pool genesis (outputs only) | 24,702 → **12,617** | 25 / 1,236 / 2,471 → **13 / 631 / 1,262** | 2 → 2,000 | |
+
+Fixed cost per swap at 100 sat/kB drops from ~8,060 to ~5,650 sats; at 1 sat/kB it is ~3,030 sats and the index fee is now ~99% of it. The remaining ~26 kB is: the pool code twice (new output + scriptCode in the sighash preimage, ~10.7 kB each), the two vault spends (~1.2 kB each, mostly their own preimage) and the two vault outputs (~0.85 kB each).
+
+Where the 9.8 kB of pool code now goes (by recompiling variants): token proof ≈ 1.6 kB (input walk ≈ 290 bytes per allowed parent input), decimal encoder ≈ 0.45 kB per copy x 4, preimage/OP_PUSH_TX + state ≈ 1 kB, the rest is the four ops' maths and output building.
+
+### 13.3 Given up / trade-offs
+- **Multi-input trades.** One token UTXO per trade; a trader holding the amount across several UTXOs must merge first (one self-send, one index fee). A trade can still return token change in `change`.
+- **Parent bounds.** A token UTXO whose parent has more than 5 inputs, or sits at vout 4 or higher, cannot be traded directly; a self-send to a canonical output fixes it. Parent fields (unlocking scripts) of 64 kB or more are refused (Phase C allowed 5-byte varints).
+- **Zero amounts.** The contract refuses to write or prove a 0 amount. No valid op needed one (a remove that would pay 0 tokens already failed `slippage`).
+- **API change.** Callers use `trade(...)`; the remove-liquidity payout order changed (§13.1 item 1). The TS mock chain (`contracts/src/mockchain.ts`) is still the Phase B model (multi-input, old layout) and is not the spec for these details; the sCrypt tests are.
+- Not done: moving the token proof into a separate helper input (§12.4 option d) so buys do not carry it (~1.6 kB of code, ~3.2 kB per tx). It needs a second contract and another binding, i.e. more audit surface; left for later if the miner fee matters more than the index fee.
+
+### 13.4 Tests (30 sCrypt + 24 TS, all passing)
+New: the compiled ABI has a single public `trade` with one `bytes` parent and one `int` amount (no arrays); a trade split across two token inputs is rejected (honest claim → `token inputs short`, combined claim → proof fails) while the same amount merged into one input is accepted; a token input that is not input 3 is rejected; a buy payout is sold straight back from the pool tx; parents with 6 inputs or vout 4 are rejected while 5 inputs / vout 3 pass; `int2Ascii` refuses 0 and > 20 digits and encodes u64 max. All Phase C tests still pass unchanged apart from the call syntax and the remove payout order.

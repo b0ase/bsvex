@@ -1,5 +1,5 @@
 /**
- * BSVEX constant-product pool (Phase C, 28 Oct 2026).
+ * BSVEX constant-product pool (Phase C, shrunk in Phase D, 28 Oct 2026).
  *
  * STATUS: compiles with pinned scrypt-ts 1.4.5 + scryptc 1.20.0 and runs on
  * the local script interpreter only. Not deployed, not audited.
@@ -7,6 +7,7 @@
  * Every pool transaction has the same three contract inputs and outputs:
  *   inputs : [0] AmmPool  [1] Vault(token)  [2] Vault(LP)  [3..] trader
  *   outputs: [0] AmmPool' [1] Vault(token)' [2] Vault(LP)' [..] payouts [..] trader change
+ * Phase D: one public method `trade`, one trader token input (input 3).
  * The LP vault is recreated on every call (Phase B only recreated it on
  * add/remove). That costs one extra token output per swap but lets both
  * vaults use the simple sibling binding; see docs/amm-design.md §12.2 for
@@ -14,16 +15,15 @@
  *
  * The maths mirrors ../../src/math.ts exactly; the tests there are the spec.
  */
-import { assert, ByteString, FixedArray, hash256, method, prop, PubKeyHash, slice, SmartContract, toByteString, Utils } from 'scrypt-ts'
+import { assert, ByteString, hash256, method, prop, PubKeyHash, slice, SmartContract, toByteString, Utils } from 'scrypt-ts'
 import { Bsv21 } from './bsv21'
 
-/** Max trader token inputs (and parent txs) per call. */
-export const MAX_TOKEN_INPUTS = 2
+/** One trader token input per call (owner decision 28 Oct): input 3. */
+export const MAX_TOKEN_INPUTS = 1
 
 export class AmmPool extends SmartContract {
     @prop() static readonly BPS: bigint = 10000n
     @prop() static readonly MIN_PROTOCOL_FEE: bigint = 1n
-    @prop() static readonly FIRST_TRADER_INPUT: bigint = 3n
 
     @prop() readonly tokenId: ByteString // ASCII "<txid>_<vout>" of the traded BSV-21 token
     @prop() readonly lpTokenId: ByteString // ASCII id of this pool's LP share token
@@ -80,146 +80,122 @@ export class AmmPool extends SmartContract {
         return f < AmmPool.MIN_PROTOCOL_FEE ? AmmPool.MIN_PROTOCOL_FEE : f
     }
 
-    /** Inputs 1 and 2 must be this pool's sibling vaults. */
+    /**
+     * The one entry point (Phase D: a single public method so the output
+     * builder, the vault check and the decimal encoder are in the script once).
+     *   op 0 buy     swapSatsForTokens(a = satsIn,   b = minTokensOut)
+     *   op 1 sell    swapTokensForSats(a = tokensIn, b = minSatsOut)
+     *   op 2 add     addLiquidity     (a = satsIn,   b = maxTokensIn, c = minLpOut)
+     *   op 3 remove  removeLiquidity  (a = lpIn,     b = minSatsOut,  c = minTokensOut)
+     *
+     * ONE token input per trade (owner, 28 Oct): for ops 1-3 the trader's
+     * token (or LP share) input must be input 3, and only input 3 is credited.
+     * Tokens on any other input count for nothing, so a trade that needs two
+     * UTXOs fails 'token inputs short'; traders merge their tokens first.
+     * `parent` is input 3's parent tx and `parentAmt` the amount it carries;
+     * for op 0 both are ignored (pass '' and 0). Any surplus of parentAmt over
+     * what the op uses must go back to the trader in `change`, or the
+     * indexer burns it.
+     *
+     * Outputs: [0] pool' [1] token vault' [2] LP vault'
+     *          [3] token payout (op 0 tokens, op 2 LP shares, op 3 tokens)
+     *          [.] sats to trader (ops 1, 3)  [.] protocol fee (ops 0, 1)
+     *          [..] change (trader's, unchecked)
+     */
     @method()
-    checkVaultInputs(): boolean {
+    public trade(op: bigint, a: bigint, b: bigint, c: bigint, trader: PubKeyHash, parent: ByteString, parentAmt: bigint, change: ByteString) {
+        // Inputs 0..2 are this pool and its sibling vaults.
         const myTxid = this.ctx.utxo.outpoint.txid
         assert(this.ctx.utxo.outpoint.outputIndex == 0n, 'pool must be output 0')
-        assert(slice(this.prevouts, 0n, 36n) == myTxid + toByteString('00000000'), 'pool must be input 0')
-        assert(slice(this.prevouts, 36n, 72n) == myTxid + toByteString('01000000'), 'input 1 not my token vault')
-        assert(slice(this.prevouts, 72n, 108n) == myTxid + toByteString('02000000'), 'input 2 not my LP vault')
-        return true
-    }
-
-    /** Outputs 0..2: pool', token vault', LP vault'. Enforces the pool cap. */
-    @method()
-    poolOutputs(): ByteString {
-        assert(this.sats <= this.maxSats, 'pool cap')
-        assert(this.tokens > 0n && this.sats > 0n)
-        return (
-            this.buildStateOutput(this.sats) +
-            Bsv21.transferOutput(this.tokenId, this.tokens, this.vaultCode) +
-            Bsv21.transferOutput(this.lpTokenId, this.lpUnissued, this.vaultCode)
+        assert(
+            slice(this.prevouts, 0n, 108n) ==
+                myTxid + toByteString('00000000') + myTxid + toByteString('01000000') + myTxid + toByteString('02000000'),
+            'inputs 0-2 must be my pool and vaults'
         )
-    }
-
-    /**
-     * Sum of BSV-21 `id` carried by trader inputs 3..3+n-1, proven from their
-     * parent txs (design §9.1 a). The caller states each input's amt; the
-     * contract checks the parent hash, walks to the output and compares the
-     * inscription bytes. Cannot prove the parents were indexer-valid (§9.1 b,
-     * residual risk handled off chain).
-     */
-    @method()
-    provenTokenIn(
-        id: ByteString,
-        parents: FixedArray<ByteString, typeof MAX_TOKEN_INPUTS>,
-        amts: FixedArray<bigint, typeof MAX_TOKEN_INPUTS>,
-        n: bigint
-    ): bigint {
-        assert(n > 0n && n <= MAX_TOKEN_INPUTS, 'token input count')
-        let total = 0n
-        for (let i = 0; i < MAX_TOKEN_INPUTS; i++) {
-            if (BigInt(i) < n) {
-                const at = (AmmPool.FIRST_TRADER_INPUT + BigInt(i)) * 36n
-                const vout = Utils.fromLEUnsigned(slice(this.prevouts, at + 32n, at + 36n))
-                assert(hash256(parents[i]) == slice(this.prevouts, at, at + 32n), 'parent mismatch')
-                assert(Bsv21.isTransfer(Bsv21.outputScript(parents[i], vout), id, amts[i]), 'not a transfer of id/amt')
-                total += amts[i]
-            }
-        }
-        return total
-    }
-
-    @method()
-    public swapSatsForTokens(satsIn: bigint, minOut: bigint, trader: PubKeyHash, change: ByteString) {
-        this.checkVaultInputs()
-        const oldK = this.sats * this.tokens
-        const pFee = this.protocolFee(satsIn)
-        assert(satsIn > pFee)
-        const net = satsIn - pFee
-        const out = AmmPool.amountOut(net, this.sats, this.tokens, this.lpFeeBps)
-        assert(out > 0n && out >= minOut, 'slippage')
-        assert(out < this.tokens)
-        this.sats += net
-        this.tokens -= out
-        assert(this.sats * this.tokens >= oldK, 'k decreased')
-        const outputs =
-            this.poolOutputs() +
-            Bsv21.transferOutput(this.tokenId, out, Utils.buildPublicKeyHashScript(trader)) +
-            Utils.buildPublicKeyHashOutput(this.protocolPkh, pFee) +
-            change
-        assert(hash256(outputs) == this.ctx.hashOutputs, 'outputs mismatch')
-    }
-
-    /**
-     * Every call that takes tokens in goes through here, so the (large)
-     * token-input proof is in the script once, not three times.
-     *   op 1 swapTokensForSats(a = tokensIn, b = minSatsOut)
-     *   op 2 addLiquidity(a = satsIn, b = maxTokensIn, c = minLpOut)
-     *   op 3 removeLiquidity(a = lpIn, b = minSatsOut, c = minTokensOut)  (LP tokens in)
-     * Token input amounts beyond what the op needs must be returned by the
-     * trader in `change` (a token change output), or the indexer burns them.
-     */
-    @method()
-    public tokenCall(
-        op: bigint,
-        a: bigint,
-        b: bigint,
-        c: bigint,
-        trader: PubKeyHash,
-        parents: FixedArray<ByteString, typeof MAX_TOKEN_INPUTS>,
-        amts: FixedArray<bigint, typeof MAX_TOKEN_INPUTS>,
-        nParents: bigint,
-        change: ByteString
-    ) {
-        this.checkVaultInputs()
-        assert(op >= 1n && op <= 3n, 'bad op')
+        assert(op >= 0n && op <= 3n, 'bad op')
         assert(a > 0n)
-        const proven = this.provenTokenIn(op == 3n ? this.lpTokenId : this.tokenId, parents, amts, nParents)
-        let payouts = toByteString('')
 
-        if (op == 1n) {
-            // swap tokens -> sats
-            assert(proven >= a, 'token inputs short')
+        // Token proof (design §9.1 a), once, for input 3 only.
+        let proven = 0n
+        if (op > 0n) {
+            assert(
+                hash256(parent) == slice(this.prevouts, 108n, 140n) &&
+                    Bsv21.isTransfer(
+                        Bsv21.outputScript(parent, Utils.fromLEUnsigned(slice(this.prevouts, 140n, 144n))),
+                        op == 3n ? this.lpTokenId : this.tokenId,
+                        parentAmt
+                    ),
+                'input 3 is not a transfer of id/amt'
+            )
+            proven = parentAmt
+        }
+
+        let payId = this.tokenId
+        let payAmt = 0n
+        let satsToTrader = 0n
+        let pFee = 0n
+        if (op <= 1n) {
+            // swaps
             const oldK = this.sats * this.tokens
-            const gross = AmmPool.amountOut(a, this.tokens, this.sats, this.lpFeeBps)
-            const pFee = this.protocolFee(gross)
-            assert(gross > pFee && gross < this.sats)
-            const out = gross - pFee
-            assert(out >= b, 'slippage')
-            this.sats -= gross
-            this.tokens += a
+            if (op == 0n) {
+                pFee = this.protocolFee(a)
+                assert(a > pFee)
+                const net = a - pFee
+                payAmt = AmmPool.amountOut(net, this.sats, this.tokens, this.lpFeeBps)
+                assert(payAmt > 0n && payAmt >= b && payAmt < this.tokens, 'slippage')
+                this.sats += net
+                this.tokens -= payAmt
+            } else {
+                assert(proven >= a, 'token inputs short')
+                const gross = AmmPool.amountOut(a, this.tokens, this.sats, this.lpFeeBps)
+                pFee = this.protocolFee(gross)
+                assert(gross > pFee && gross < this.sats)
+                satsToTrader = gross - pFee
+                assert(satsToTrader >= b, 'slippage')
+                this.sats -= gross
+                this.tokens += a
+            }
             assert(this.sats * this.tokens >= oldK, 'k decreased')
-            payouts = Utils.buildPublicKeyHashOutput(trader, out) + Utils.buildPublicKeyHashOutput(this.protocolPkh, pFee)
         } else if (op == 2n) {
             // add liquidity: a sats + ceil(a*tokens/sats) tokens
             const tokensIn = (a * this.tokens + this.sats - 1n) / this.sats
             assert(tokensIn <= b, 'slippage')
             assert(proven >= tokensIn, 'token inputs short')
-            const lpOut = (a * this.lpSupply) / this.sats
-            assert(lpOut > 0n && lpOut >= c && lpOut < this.lpUnissued, 'slippage')
+            payAmt = (a * this.lpSupply) / this.sats
+            assert(payAmt > 0n && payAmt >= c && payAmt < this.lpUnissued, 'slippage')
+            payId = this.lpTokenId
             this.sats += a
             this.tokens += tokensIn
-            this.lpSupply += lpOut
-            this.lpUnissued -= lpOut
-            payouts = Bsv21.transferOutput(this.lpTokenId, lpOut, Utils.buildPublicKeyHashScript(trader))
+            this.lpSupply += payAmt
+            this.lpUnissued -= payAmt
         } else {
-            // remove liquidity: LP shares in (Phase B forgot to prove these)
+            // remove liquidity: LP shares in
             assert(proven >= a, 'LP inputs short')
             assert(this.lpSupply - a >= this.lockedLp, 'locked liquidity')
-            const satsOut = (a * this.sats) / this.lpSupply
-            const tokensOut = (a * this.tokens) / this.lpSupply
-            assert(satsOut >= b && tokensOut >= c && satsOut > 0n && tokensOut > 0n, 'slippage')
-            this.sats -= satsOut
-            this.tokens -= tokensOut
+            satsToTrader = (a * this.sats) / this.lpSupply
+            payAmt = (a * this.tokens) / this.lpSupply
+            assert(satsToTrader >= b && payAmt >= c && satsToTrader > 0n && payAmt > 0n, 'slippage')
+            this.sats -= satsToTrader
+            this.tokens -= payAmt
             this.lpSupply -= a
             this.lpUnissued += a
-            payouts =
-                Utils.buildPublicKeyHashOutput(trader, satsOut) +
-                Bsv21.transferOutput(this.tokenId, tokensOut, Utils.buildPublicKeyHashScript(trader))
         }
-        const outputs = this.poolOutputs() + payouts + change
-        assert(hash256(outputs) == this.ctx.hashOutputs, 'outputs mismatch')
+
+        assert(this.sats <= this.maxSats, 'pool cap')
+        assert(this.tokens > 0n && this.sats > 0n)
+        let outputs =
+            this.buildStateOutput(this.sats) +
+            Bsv21.transferOutput(this.tokenId, this.tokens, this.vaultCode) +
+            Bsv21.transferOutput(this.lpTokenId, this.lpUnissued, this.vaultCode)
+        if (payAmt > 0n) {
+            outputs += Bsv21.transferOutput(payId, payAmt, Utils.buildPublicKeyHashScript(trader))
+        }
+        if (satsToTrader > 0n) {
+            outputs += Utils.buildPublicKeyHashOutput(trader, satsToTrader)
+        }
+        if (pFee > 0n) {
+            outputs += Utils.buildPublicKeyHashOutput(this.protocolPkh, pFee)
+        }
+        assert(hash256(outputs + change) == this.ctx.hashOutputs, 'outputs mismatch')
     }
 }

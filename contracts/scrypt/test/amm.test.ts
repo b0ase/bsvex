@@ -1,12 +1,12 @@
 import { expect } from 'chai'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { bsv, toByteString, Utils } from 'scrypt-ts'
 import { AmmPool } from '../src/contracts/ammPool'
 import { Vault } from '../src/contracts/vault'
 import { Bsv21 } from '../src/contracts/bsv21'
 import {
-    ascii, Built, fakeTxid, fundingTx, genesis, LP_MAX, LP_TOKEN_ID, newPool, p2pkh, pad, PROTOCOL_PKH, randomTrader, spend, Tip,
+    ascii, Built, fakeTxid, fundingTx, genesis, LP_MAX, LP_TOKEN_ID, newPool, p2pkh, PROTOCOL_PKH, randomTrader, spend, Tip,
     TOKEN_ID, transferScript, VAULT_CODE,
 } from './harness'
 
@@ -34,6 +34,13 @@ function seededTip(opts: { protocolFeeBps?: bigint; maxSats?: bigint; lockedLp?:
         sats, tokens, lpSupply: L, lpUnissued: LP_MAX - L,
     })
     return { tx: genesis(pool), pool }
+}
+
+/** Phase C figures (commit 1a62095) kept for the before/after table. */
+const PHASE_C = {
+    poolScriptBytes: 22791,
+    vaultScriptBytes: 704,
+    txBytes: { swapSatsForTokens: 50581, swapTokensForSats: 51073, addLiquidity: 51194, removeLiquidity: 51229, poolGenesis: 24702 },
 }
 
 const sizes: Record<string, { bytes: number; contractInputs: number[]; outputs: number }> = {}
@@ -76,7 +83,7 @@ function satsSwap(tip: Tip, satsIn: bigint, minOut?: bigint) {
         ],
         [{ script: p2pkh(t.pkh), sats: 5_000n }],
         (n) => { n.sats += satsIn - fee; n.tokens -= out },
-        (self, change) => self.swapSatsForTokens(satsIn, minOut ?? out, t.pkh, change)
+        (self, change) => self.trade(0n, satsIn, minOut ?? out, 0n, t.pkh, toByteString(''), 0n, change)
     )
     return { b, out, fee }
 }
@@ -99,7 +106,7 @@ function tokenSwap(tip: Tip, tokensIn: bigint, o: { claimAmt?: bigint; parentAmt
         [{ script: p2pkh(t.pkh), sats: 5_000n }],
         (n) => { n.sats -= gross; n.tokens += tokensIn },
         (self, change) =>
-            self.tokenCall(1n, tokensIn, gross - fee, 0n, t.pkh, pad([parentHex], toByteString('')), pad([o.claimAmt ?? tokensIn], 0n), 1n, change)
+            self.trade(1n, tokensIn, gross - fee, 0n, t.pkh, parentHex, o.claimAmt ?? tokensIn, change)
     )
     return { b, gross, fee }
 }
@@ -114,7 +121,10 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
     })
 
     it('Bsv21.int2Ascii and inscription match the 1Sat transfer format', () => {
-        expect(Bsv21.int2Ascii(0n)).to.eq(toByteString('0', true))
+        expect(() => Bsv21.int2Ascii(0n)).to.throw(/amt must be > 0/)
+        expect(Bsv21.int2Ascii(7n)).to.eq(toByteString('7', true))
+        expect(Bsv21.int2Ascii(18446744073709551615n)).to.eq(toByteString('18446744073709551615', true))
+        expect(() => Bsv21.int2Ascii(10n ** 20n)).to.throw(/amt too large/)
         expect(Bsv21.int2Ascii(1234567890123456789n)).to.eq(toByteString('1234567890123456789', true))
         const json = Buffer.from(Bsv21.transferJson(TOKEN_ID, 42n), 'hex').toString()
         expect(JSON.parse(json)).to.deep.eq({ p: 'bsv-20', op: 'transfer', id: `${fakeTxid(0xaa)}_0`, amt: '42' })
@@ -131,7 +141,7 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
         expect(Bsv21.isTransfer(parent.outputs[2].script.toHex(), LP_TOKEN_ID, 77n)).to.eq(false)
     })
 
-    describe('swapSatsForTokens', () => {
+    describe('trade op 0: swapSatsForTokens', () => {
         it('accepts a correct swap; all three contract inputs verify', () => {
             const { b } = satsSwap(seededTip(), 1_000_000n)
             expect(b.results, JSON.stringify(b.results)).to.satisfy(() => b.ok)
@@ -172,7 +182,7 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
         })
     })
 
-    describe('tokenCall op 1: swapTokensForSats with the in-contract token proof', () => {
+    describe('trade op 1: swapTokensForSats with the in-contract token proof', () => {
         it('accepts proven token input (canonical inscription)', () => {
             const { b } = tokenSwap(seededTip(), 10_000n)
             expect(b.ok, JSON.stringify(b.results)).to.eq(true)
@@ -193,7 +203,79 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
         })
     })
 
-    describe('tokenCall op 2/3: add and remove liquidity', () => {
+    describe('one token input per trade (owner, 28 Oct) and parent bounds', () => {
+        /** Sell `tokensIn` with explicit trader inputs; input 3 is proven with (parentHex, claim). */
+        function sellWith(tip: Tip, inputs: { tx: bsv.Transaction; vout: number }[], parentHex: string, claim: bigint, tokensIn: bigint) {
+            const t = randomTrader()
+            const gross = amountOut(tokensIn, tip.pool.tokens, tip.pool.sats, tip.pool.lpFeeBps)
+            const fee = pFeeOf(gross, tip.pool.protocolFeeBps)
+            return spend(
+                tip,
+                inputs,
+                [
+                    { script: p2pkh(t.pkh), sats: gross - fee },
+                    { script: p2pkh(PROTOCOL_PKH), sats: fee },
+                ],
+                [{ script: p2pkh(t.pkh), sats: 5_000n }],
+                (n) => { n.sats -= gross; n.tokens += tokensIn },
+                (self, change) => self.trade(1n, tokensIn, gross - fee, 0n, t.pkh, parentHex, claim, change)
+            )
+        }
+        const fund = () => ({ tx: fundingTx([{ script: p2pkh(randomTrader().pkh), sats: 10_000n }], 0x34), vout: 0 })
+
+        it('the compiled ABI has one public method taking one parent tx and one amount (no arrays)', () => {
+            const art = JSON.parse(readFileSync(join(__dirname, '..', 'artifacts', 'ammPool.json'), 'utf8'))
+            const pub = art.abi.filter((f: { type: string }) => f.type === 'function')
+            expect(pub.map((f: { name: string }) => f.name)).to.deep.eq(['trade'])
+            const params = Object.fromEntries(pub[0].params.map((x: { name: string; type: string }) => [x.name, x.type]))
+            expect(params.parent).to.eq('bytes')
+            expect(params.parentAmt).to.eq('int')
+            expect(Object.values(params).some((t) => String(t).includes('['))).to.eq(false)
+        })
+        it('rejects a trade split across two token inputs (only input 3 is credited)', () => {
+            const t = randomTrader()
+            const p1 = tokenParent(TOKEN_ID, 5_000n, t.pkh, 'canonical', 0, 1)
+            const p2 = tokenParent(TOKEN_ID, 5_000n, t.pkh, 'canonical', 1, 1)
+            const inputs = [{ tx: p1, vout: 0 }, { tx: p2, vout: 1 }, fund()]
+            // honest claim of input 3's amount: short of 10k
+            const b = sellWith(seededTip(), inputs, p1.toBuffer().toString('hex'), 5_000n, 10_000n)
+            expect(b.ok).to.eq(false)
+            expect(b.jsError ?? '').to.match(/token inputs short/)
+            // claiming the combined amount against input 3 alone fails the proof
+            const c = sellWith(seededTip(), inputs, p1.toBuffer().toString('hex'), 10_000n, 10_000n)
+            expect(c.ok).to.eq(false)
+            // the same 10k merged into one input first is accepted
+            const merged = tokenParent(TOKEN_ID, 10_000n, t.pkh, 'canonical', 0, 2)
+            expect(sellWith(seededTip(), [{ tx: merged, vout: 0 }, fund()], merged.toBuffer().toString('hex'), 10_000n, 10_000n).ok).to.eq(true)
+        })
+        it('rejects a token input that is not input 3', () => {
+            const t = randomTrader()
+            const p = tokenParent(TOKEN_ID, 10_000n, t.pkh)
+            const b = sellWith(seededTip(), [fund(), { tx: p, vout: 0 }], p.toBuffer().toString('hex'), 10_000n, 10_000n)
+            expect(b.ok).to.eq(false)
+        })
+        it('a buy payout (output 3 of a pool tx) can be sold straight back', () => {
+            const buy = satsSwap(seededTip(), 1_000_000n)
+            expect(buy.b.ok).to.eq(true)
+            const tip2 = { tx: buy.b.tx, pool: buy.b.next }
+            // a fresh trader owns the payout in this test; the lock is not what the pool checks
+            const b = sellWith(tip2, [{ tx: buy.b.tx, vout: 3 }, fund()], buy.b.tx.toBuffer().toString('hex'), buy.out, buy.out)
+            expect(b.ok, JSON.stringify(b.results)).to.eq(true)
+        })
+        it('rejects parents beyond the bounds (inputs > 5, vout > 3)', () => {
+            const t = randomTrader()
+            const many = tokenParent(TOKEN_ID, 10_000n, t.pkh, 'canonical', 0, 6)
+            expect(sellWith(seededTip(), [{ tx: many, vout: 0 }, fund()], many.toBuffer().toString('hex'), 10_000n, 10_000n).ok).to.eq(false)
+            const five = tokenParent(TOKEN_ID, 10_000n, t.pkh, 'canonical', 0, 5)
+            expect(sellWith(seededTip(), [{ tx: five, vout: 0 }, fund()], five.toBuffer().toString('hex'), 10_000n, 10_000n).ok).to.eq(true)
+            const v3 = tokenParent(TOKEN_ID, 10_000n, t.pkh, 'canonical', 3, 1)
+            expect(sellWith(seededTip(), [{ tx: v3, vout: 3 }, fund()], v3.toBuffer().toString('hex'), 10_000n, 10_000n).ok).to.eq(true)
+            const v4 = tokenParent(TOKEN_ID, 10_000n, t.pkh, 'canonical', 4, 1)
+            expect(sellWith(seededTip(), [{ tx: v4, vout: 4 }, fund()], v4.toBuffer().toString('hex'), 10_000n, 10_000n).ok).to.eq(false)
+        })
+    })
+
+    describe('trade op 2/3: add and remove liquidity', () => {
         function add(tip: Tip, satsIn: bigint) {
             const t = randomTrader()
             const tokensIn = (satsIn * tip.pool.tokens + tip.pool.sats - 1n) / tip.pool.sats
@@ -206,7 +288,7 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
                 [{ script: transferScript(LP_TOKEN_ID, lpOut, p2pkh(t.pkh)), sats: 1n }],
                 [{ script: p2pkh(t.pkh), sats: 5_000n }],
                 (n) => { n.sats += satsIn; n.tokens += tokensIn; n.lpSupply += lpOut; n.lpUnissued -= lpOut },
-                (self, change) => self.tokenCall(2n, satsIn, tokensIn, lpOut, t.pkh, pad([parent.toBuffer().toString('hex')], toByteString('')), pad([tokensIn], 0n), 1n, change)
+                (self, change) => self.trade(2n, satsIn, tokensIn, lpOut, t.pkh, parent.toBuffer().toString('hex'), tokensIn, change)
             )
             return { b, lpOut, t }
         }
@@ -220,12 +302,13 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
                 tip,
                 [{ tx: parent, vout: 0 }, { tx: fund, vout: 0 }],
                 [
+                    // the contract refuses a 0-token payout; skip it here so the call reaches the contract
+                    ...(tokensOut > 0n ? [{ script: transferScript(TOKEN_ID, tokensOut, p2pkh(t.pkh)), sats: 1n }] : []),
                     { script: p2pkh(t.pkh), sats: satsOut },
-                    { script: transferScript(TOKEN_ID, tokensOut, p2pkh(t.pkh)), sats: 1n },
                 ],
                 [{ script: p2pkh(t.pkh), sats: 5_000n }],
                 (n) => { n.sats -= satsOut; n.tokens -= tokensOut; n.lpSupply -= lpIn; n.lpUnissued += lpIn },
-                (self, change) => self.tokenCall(3n, lpIn, satsOut, tokensOut, t.pkh, pad([parent.toBuffer().toString('hex')], toByteString('')), pad([proveWith], 0n), 1n, change)
+                (self, change) => self.trade(3n, lpIn, satsOut, tokensOut, t.pkh, parent.toBuffer().toString('hex'), proveWith, change)
             )
         }
         it('add liquidity verifies', () => {
@@ -289,7 +372,7 @@ describe('BSVEX AMM (sCrypt, local interpreter only)', function () {
         const table = Object.fromEntries(
             Object.entries(sizes).map(([k, v]) => [k, { ...v, minerFeeSats: Object.fromEntries(rates.map((r) => [`${r}sat/kB`, Math.ceil((v.bytes * r) / 1000)])) }])
         )
-        writeFileSync(out, JSON.stringify({ note: 'Measured locally with scrypt-ts 1.4.5 / scryptc 1.20.0. Trader P2PKH unlocks are 107-byte placeholders. Not broadcast.', poolScriptBytes: seededTip().pool.lockingScript.toBuffer().length, vaultScriptBytes: VAULT_CODE.length / 2, txs: table }, null, 2) + '\n')
+        writeFileSync(out, JSON.stringify({ note: 'Phase D. Measured locally with scrypt-ts 1.4.5 / scryptc 1.20.0. Trader P2PKH unlocks are 107-byte placeholders. Not broadcast.', poolScriptBytes: seededTip().pool.lockingScript.toBuffer().length, vaultScriptBytes: VAULT_CODE.length / 2, txs: table, phaseC: PHASE_C }, null, 2) + '\n')
         console.log(JSON.stringify(table, null, 2))
     })
 })

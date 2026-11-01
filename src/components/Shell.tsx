@@ -28,15 +28,15 @@ export function Shell() {
       </aside>
       <header className="xs-wrap xs-nav">
         <a className="xs-brand" href="/" aria-label="BSVEX home">
-          <span className="bx-sq" aria-hidden="true" />
+          <img src="/bsvex-mark.svg" alt="" width="24" height="24" className="bx-mark" />
           <span>
             BSVE<i className="bx-x">X</i>
           </span>
         </a>
         <nav className="xs-links" aria-label="Main">
-          <a href="#board">Tokens</a>
-          <a className="xs-hs" href="#sales">Sales</a>
-          <a className="xs-hs" href="#status">Status</a>
+          <a href="#trade">Trade</a>
+          <a className="xs-hs" href="#board">Tokens</a>
+                    <a className="xs-hs" href="#status">Status</a>
           <span data-bwx-connect="" data-fg="#19c2a0" suppressHydrationWarning />
         </nav>
         <Script

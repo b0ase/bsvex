@@ -7,12 +7,22 @@ import { getSales, getTokens, sats, ago } from "@/lib/market";
 export const revalidate = 300;
 const REPO = "https://github.com/b0ase/bsvex";
 
+const CATS: Array<{ ic: string; t: string; d: string; live?: boolean; href?: string }> = [
+  { ic: "◎", t: "Tokens", d: "Every BSV-21 token, ranked by activity.", live: true, href: "#board" },
+  { ic: "◆", t: "Art & NFTs", d: "List what you minted, set a price, sell in one tap." },
+  { ic: "♪", t: "Music", d: "Singles, albums and versions you minted on bMusicX." },
+  { ic: "▶", t: "Movies & video", d: "Films and clips you minted on bMoviesX and bVideoX." },
+  { ic: "◉", t: "Your data", d: "Sell what you choose (interests, shopping taste) to who you choose, at your price. Stop any time." },
+  { ic: "✦", t: "Names, notes & coins", d: "$names, PoW notes, bAvatar coins and tickets." },
+];
+
 const STATUS: Array<[boolean, string, string?]> = [
-  [true, "Live: BSV-21 token board and recent 1Sat market sales, read from 1sat.market"],
+  [true, "Live: browse BSV-21 tokens and recent 1Sat sales (data from 1sat.market)"],
   [true, "Live: connect bWalletX"],
   [false, "Built, in review: pool design, maths, simulated chain, compiled contracts", `${REPO}/pulls`],
   [false, "Not open yet: security audit, testnet pools"],
   [false, "Not open yet: swapping and adding liquidity in BSVEX pools"],
+  [false, "Not open yet: listing and selling art, music, movies, names and your data from bWalletX"],
 ];
 
 export default async function Home() {
@@ -35,10 +45,10 @@ export default async function Home() {
           <h1 className="xs-h1">
             BSVE<i>X</i>
           </h1>
-          <p className="xs-lede">Every BSV-21 token in one place, with recent sales from 1sat.market. Our open, on-chain exchange is not open yet.</p>
+          <p className="xs-lede">The place to trade anything you mint in bWalletX: tokens, art, music, movies, even your own data, on your terms. Browse tokens today; trading in BSVEX is not open yet.</p>
           <div className="bx-btns">
-            <a className="xs-btn bx-acc" href="#board">
-              Browse tokens
+            <a className="xs-btn bx-acc" href="#trade">
+              What you can trade
             </a>
             <a className="xs-btn xs-ghost" href="#status">
               How BSVEX works
@@ -82,6 +92,25 @@ export default async function Home() {
             <b className="bx-dim">Not open yet</b>
           </div>
         </div>
+
+
+        <section id="trade" className="bx-trade">
+          <p className="xs-eye">Trade anything</p>
+          <h2 className="bx-h2">
+            If you minted it, you can <i>sell it</i>.
+          </h2>
+          <p className="bx-sub">Everything you make in the Mint lands in your bWalletX. BSVEX is where you list it, price it and sell it, straight from your wallet.</p>
+          <div className="bx-cats">
+            {CATS.map((c) => (
+              <a key={c.t} className={c.live ? "bx-cat live" : "bx-cat"} href={c.href ?? "#status"}>
+                <span className="bx-cat-ic" aria-hidden="true">{c.ic}</span>
+                <b>{c.t}</b>
+                <span>{c.d}</span>
+                <span className={c.live ? "st live" : "st"}>{c.live ? "Browse now" : "Not open yet"}</span>
+              </a>
+            ))}
+          </div>
+        </section>
 
         <div className="bx-cols">
           <section id="board">

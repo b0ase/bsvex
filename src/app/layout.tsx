@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BSVEX",
-  description: "Every BSV-21 token in one place, with live sales from 1sat.market. Part of bWalletX. BSVEX pools are not open yet.",
+  description: "Trade anything you mint in bWalletX: tokens, art, music, movies, even your own data. Browse BSV-21 tokens today; trading is not open yet.",
   metadataBase: new URL("https://www.bsvex.com"),
   openGraph: { title: "BSVEX", description: "An open exchange for BSV-21 tokens, run by contracts on Bitcoin. Not open yet.", url: "/" },
   robots: { index: true, follow: true },

@@ -1,15 +1,17 @@
 # BSVEX
 
-> BSVEX (bsvex.com) is from The Bitcoin Corporation Ltd. Status: coming soon. Nothing is live on this site; it is a holding page.
+> BSVEX (bsvex.com) is from The Bitcoin Corporation Ltd: an open, non-custodial exchange for BSV-21 tokens, run by contracts on Bitcoin. Status: not open yet. Nothing on this site trades or takes deposits.
 
 ## Status
 
-- No product, service, token or price is published here yet.
+- Built, in review (GitHub PRs #3-#5 at https://github.com/b0ase/bsvex): pool design, pricing maths with tests, a simulated chain, compiled pool contracts.
+- Not open yet: security audit, testnet pools, trading and liquidity on mainnet.
+- No token or price is published here.
 - The old bsvex.com site (a "burn L1 tokens for BSV" exchange) is retired. Any description of BSVEX as a burn, bridge or exchange service you can use today is out of date.
 
 ## Pages
 
-- [BSVEX](https://www.bsvex.com/): holding page (name and COMING SOON).
+- [BSVEX](https://www.bsvex.com/): what BSVEX is, how it will work, and what is built so far.
 
 ## Get bWalletX
 

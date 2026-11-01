@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BSVEX · Coming soon",
-  description: "BSVEX, from The Bitcoin Corporation. Coming soon.",
+  title: "BSVEX",
+  description: "An open exchange for BSV-21 tokens, run by contracts on Bitcoin. Nobody holds your coins. Not open yet.",
   metadataBase: new URL("https://www.bsvex.com"),
-  openGraph: { title: "BSVEX", description: "Coming soon.", url: "/" },
+  openGraph: { title: "BSVEX", description: "An open exchange for BSV-21 tokens, run by contracts on Bitcoin. Not open yet.", url: "/" },
   robots: { index: true, follow: true },
 };
 

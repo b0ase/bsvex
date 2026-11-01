@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
-:root { --bg: #000; --fg: #f5f5f0; --gold: #d4af37; --accent: #19c2a0; }
+:root { --bg: #000; --fg: #f4f1e8; --muted: #a9a69c; --gold: #f5b800; --accent: #19c2a0; --card: #0d0e11; --edge: #1f2127; --hf: "Space Grotesk", system-ui, sans-serif; --bf: "IBM Plex Sans", system-ui, sans-serif; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
-body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+body { font-family: var(--bf); -webkit-font-smoothing: antialiased; }
 
 .hold { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; padding: 16px; text-align: center;
   background: radial-gradient(60% 50% at 50% 45%, rgba(212,175,55,.10), transparent 70%), var(--bg); }
-.mark { margin: 0; font-weight: 800; letter-spacing: .04em; line-height: 1; font-size: clamp(56px, 16vw, 168px);
-  background: linear-gradient(180deg, #fff 0%, #e9e2c8 55%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+.mark { margin: 0; font-family: var(--hf); font-weight: 700; letter-spacing: .04em; line-height: 1; font-size: clamp(56px, 16vw, 168px);
+  background: linear-gradient(180deg, #ffe58a, #ffd24d 55%, #c98f00); -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: rise 1.2s cubic-bezier(.2,.7,.2,1) both; }
 .mark .x { background: none; -webkit-text-fill-color: var(--accent); color: var(--accent); text-shadow: 0 0 28px rgba(25,194,160,.35); }
 .soon { margin: 0; font-size: clamp(12px, 2.4vw, 15px); letter-spacing: .5em; padding-left: .5em; color: rgba(245,245,240,.7); animation: fade 2s .6s both; }
@@ -20,11 +20,11 @@ body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, 
 .page section, .page .foot { max-width: 980px; margin: 0 auto; padding: 0 16px; }
 .hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.1rem; padding-top: 18vh !important; padding-bottom: 12vh !important; }
 .lede { margin: 0; max-width: 34em; font-size: clamp(17px, 2.4vw, 21px); line-height: 1.5; color: rgba(245,245,240,.85); animation: fade 1.6s .3s both; }
-.page h2 { font-size: clamp(22px, 3vw, 28px); letter-spacing: -.01em; margin: 0 0 18px; }
+.page h2 { font-family: var(--hf); font-weight: 700; font-size: clamp(22px, 3vw, 28px); letter-spacing: -.01em; margin: 0 0 18px; }
 .how, .status, .open { padding-bottom: 72px !important; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; }
-.card { padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,.08); background: #0d0e10; display: grid; gap: 8px; }
-.card b { font-size: 16px; color: #fff; }
+.card { padding: 20px; border-radius: 16px; border: 1px solid var(--edge); background: var(--card); display: grid; gap: 8px; }
+.card b { font-family: var(--hf); font-size: 17px; color: var(--fg); }
 .card span { font-size: 14px; line-height: 1.55; color: rgba(245,245,240,.65); }
 .status ul { list-style: none; margin: 0; padding: 0; }
 .status li { display: flex; gap: 14px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 15px; line-height: 1.5; }

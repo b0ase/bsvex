@@ -3,11 +3,6 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "functions": {
-    "src/app/api/exchange/burn/route.ts": {
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",
@@ -26,11 +21,5 @@
         }
       ]
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/favicon.ico",
-      "destination": "/api/favicon.ico"
-    }
   ]
-} 
+}

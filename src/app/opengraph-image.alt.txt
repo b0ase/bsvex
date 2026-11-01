@@ -1,0 +1,1 @@
+BSVEX: an open exchange for BSV-21 tokens, run by contracts on Bitcoin. Not open yet.

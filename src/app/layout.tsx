@@ -3,9 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BSVEX",
-  description: "Trade anything you mint in bWalletX: tokens, art, music, movies, even your own data. Browse BSV-21 tokens today; trading is not open yet.",
+  description: "See what’s on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site.",
   metadataBase: new URL("https://www.bsvex.com"),
-  openGraph: { title: "BSVEX", description: "An open exchange for BSV-21 tokens, run by contracts on Bitcoin. Not open yet.", url: "/" },
+  openGraph: { title: "BSVEX", description: "See what’s on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site.", url: "/" },
+  twitter: { card: "summary_large_image", title: "BSVEX", description: "See what’s on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site." },
   robots: { index: true, follow: true },
 };
 

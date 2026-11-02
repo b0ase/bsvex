@@ -1,1 +1,1 @@
-BSVEX: trade anything you mint in bWalletX.
+BSVEX: see what’s on BSV. Browsing only; nothing is bought or sold on this site.

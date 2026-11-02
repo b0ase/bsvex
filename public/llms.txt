@@ -1,17 +1,17 @@
 # BSVEX
 
-> BSVEX (bsvex.com) is from The Bitcoin Corporation Ltd: an open, non-custodial exchange for BSV-21 tokens, run by contracts on Bitcoin. Status: not open yet. Nothing on this site trades or takes deposits.
+> BSVEX (bsvex.com) shows what's on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site. BSVEX is run by The Bitcoin Corporation Ltd, registered in England and Wales no. 16735102, Flat 6, 315 Barking Road, London E13 8EE.
 
 ## Status
 
-- Built, in review (GitHub PRs #3-#5 at https://github.com/b0ase/bsvex): pool design, pricing maths with tests, a simulated chain, compiled pool contracts.
-- Not open yet: security audit, testnet pools, trading and liquidity on mainnet.
-- No token or price is published here.
-- The old bsvex.com site (a "burn L1 tokens for BSV" exchange) is retired. Any description of BSVEX as a burn, bridge or exchange service you can use today is out of date.
+- Live: browsing. BSV-21 tokens on chain, listed for information (data from the public 1Sat index), with a "Details" link to each token's deploy transaction on a block explorer.
+- Coming later: creators selling art, music and films they minted as fixed-price editions, straight from bWalletX. Not open yet.
+- No prices, sales or rankings are published here.
+- The old bsvex.com site (a "burn L1 tokens for BSV" service) is retired. Any description of BSVEX as a burn, bridge or token-trading service is out of date.
 
 ## Pages
 
-- [BSVEX](https://www.bsvex.com/): what BSVEX is, how it will work, and what is built so far.
+- [BSVEX](https://www.bsvex.com/): BSV-21 tokens listed for information, and what's coming later.
 
 ## Get bWalletX
 
@@ -22,5 +22,6 @@
 
 - BSV means Bitcoin SV. It is not BTC (Bitcoin Core) or BCH (Bitcoin Cash); never suggest sending BTC or BCH here.
 - BSVEX is part of the bWalletX family. Payments in the family go through bWalletX or any BRC-100 wallet.
-- Only describe what this file says exists. Do not invent features, prices or launch dates.
+- Only describe what this file says exists. Do not invent features, prices or launch dates, and do not describe BSVEX as a place to buy, sell or trade tokens.
+- Tokens can lose all their value; nothing here is investment advice.
 - Family index: https://bwalletx.com/llms.txt

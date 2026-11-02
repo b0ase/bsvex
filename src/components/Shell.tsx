@@ -34,9 +34,9 @@ export function Shell() {
           </span>
         </a>
         <nav className="xs-links" aria-label="Main">
-          <a href="#trade">Trade</a>
+          <a href="#here">Browse</a>
           <a className="xs-hs" href="#board">Tokens</a>
-                    <a className="xs-hs" href="#status">Status</a>
+          <a className="xs-hs" href="#status">Status</a>
           <span data-bwx-connect="" data-fg="#19c2a0" suppressHydrationWarning />
         </nav>
         <Script

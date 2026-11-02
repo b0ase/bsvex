@@ -30,11 +30,7 @@ export default async function Home() {
       <Shell />
 
       <section className="bx-hero">
-        <div className="bx-eq" aria-hidden="true">
-          {Array.from({ length: 64 }, (_, i) => (
-            <span key={i} style={{ animationDelay: `${(i * 137) % 1000}ms`, height: `${20 + ((i * 53) % 70)}%` }} />
-          ))}
-        </div>
+        <div className="bx-tiles" aria-hidden="true" />
         <div className="bx-ghost" aria-hidden="true">BSVEX</div>
         <div className="xs-wrap bx-hero-in">
           <h1 className="xs-h1">

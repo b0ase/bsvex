@@ -6,12 +6,13 @@ a { color: inherit; }
 .bx-sq { width: 18px; height: 18px; border-radius: 5px; background: var(--xs-acc); display: block; }
 .xs-brand .bx-x, .xs-h1 i, .bx-h2 i { color: var(--xs-acc); font-style: normal; }
 
-/* Hero: bMusicX's giant wordmark + ghost outline + EQ bars, in BSVEX teal */
+/* Hero: bMusicX's giant wordmark + ghost outline, over a faint static grid of tiles echoing the mark (no motion) */
 .bx-hero { position: relative; overflow: hidden; isolation: isolate; min-height: clamp(320px, 46svh, 480px); display: flex; align-items: flex-end; border-bottom: 1px solid rgba(255,255,255,.08);
   background: radial-gradient(60% 80% at 30% 100%, rgba(25,194,160,.18), transparent 70%), radial-gradient(40% 60% at 85% 20%, rgba(255,210,77,.10), transparent 70%), #000; }
-.bx-eq { position: absolute; inset: auto 0 0 0; height: 46%; display: flex; align-items: flex-end; gap: 4px; padding: 0 8px; z-index: -1; opacity: .35; }
-.bx-eq span { flex: 1; background: linear-gradient(180deg, rgba(25,194,160,.9), rgba(25,194,160,.05)); border-radius: 2px 2px 0 0; transform-origin: bottom; animation: bxeq 1.6s ease-in-out infinite alternate; }
-@keyframes bxeq { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+.bx-tiles { position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect x='6' y='6' width='28' height='28' rx='7' fill='%2319c2a0' fill-opacity='.045'/%3E%3C/svg%3E");
+  background-size: 40px 40px; background-position: center bottom;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 45%, #000 100%); mask-image: linear-gradient(180deg, transparent 0, #000 45%, #000 100%); }
 .bx-ghost { position: absolute; right: -2vw; bottom: -4vw; z-index: -1; font: 800 clamp(120px, 26vw, 380px)/.8 var(--xs-hf); letter-spacing: -.04em; color: transparent; -webkit-text-stroke: 2px rgba(25,194,160,.35); white-space: nowrap; }
 .bx-hero-in { padding-top: 48px; padding-bottom: 34px; position: relative; }
 .bx-hero-in::before { content: ""; position: absolute; inset: -40px auto -20px -40px; width: min(760px, 100%); background: radial-gradient(60% 60% at 35% 55%, rgba(0,0,0,.85), transparent 75%); z-index: -1; }
@@ -55,7 +56,6 @@ a { color: inherit; }
 .st.live { background: rgba(25,194,160,.15); color: var(--xs-acc); }
 .bx-foot { padding-top: 24px; padding-bottom: 48px; border-top: 1px solid rgba(255,255,255,.08); color: #7c7a73; font-size: 13px; line-height: 1.6; }
 .bx-foot a { color: #cfcabd; }
-@media (prefers-reduced-motion: reduce) { .bx-eq span { animation: none; } }
 
 .bx-mark { display: block; width: 24px; height: 24px; }
 .bx-trade { margin-bottom: 52px; }

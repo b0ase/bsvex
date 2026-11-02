@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "BSVEX",
   description: "See what’s on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site.",
   metadataBase: new URL("https://www.bsvex.com"),
+  alternates: { canonical: "/" },
   openGraph: { title: "BSVEX", description: "See what’s on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site.", url: "/" },
   twitter: { card: "summary_large_image", title: "BSVEX", description: "See what’s on BSV: tokens, art, music and films minted in bWalletX. Browsing only. Nothing is bought or sold on this site." },
   robots: { index: true, follow: true },

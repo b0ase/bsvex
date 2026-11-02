@@ -9,12 +9,13 @@ import { getTokens } from "@/lib/market";
 export const revalidate = 300;
 const REPO = "https://github.com/b0ase/bsvex";
 
-const CATS: Array<{ ic: string; t: string; d: string; live?: boolean; href?: string }> = [
+// d: the card text (desktop); s: the one-line version for the compact "Coming later" card on phones.
+const CATS: Array<{ ic: string; t: string; d: string; s?: string; live?: boolean; href?: string }> = [
   { ic: "◎", t: "Tokens", d: "BSV-21 tokens on chain, listed for information.", live: true, href: "#board" },
-  { ic: "◆", t: "Art", d: "Fixed-price editions of art you minted, sold from bWalletX." },
-  { ic: "♪", t: "Music", d: "Fixed-price editions of singles and albums you minted on bMusicX." },
-  { ic: "▶", t: "Movies", d: "Fixed-price editions of films and clips you minted on bMoviesX and bVideoX." },
-  { ic: "✦", t: "Names", d: "$names, PoW notes and tickets as fixed-price editions." },
+  { ic: "◆", t: "Art", d: "Fixed-price editions of art you minted, sold from bWalletX.", s: "Fixed-price editions of art you minted." },
+  { ic: "♪", t: "Music", d: "Fixed-price editions of singles and albums you minted on bMusicX.", s: "Fixed-price editions from bMusicX." },
+  { ic: "▶", t: "Movies", d: "Fixed-price editions of films and clips you minted on bMoviesX and bVideoX.", s: "Fixed-price editions from bMoviesX." },
+  { ic: "✦", t: "Names", d: "$names, PoW notes and tickets as fixed-price editions.", s: "Fixed-price $names, notes and tickets." },
 ];
 
 const STATUS: Array<[boolean, string]> = [
@@ -52,13 +53,6 @@ export default async function Home() {
       </section>
 
       <main className="xs-wrap bx-main">
-        <div className="bx-stats">
-          <div>
-            <small>Tokens listed</small>
-            <b>{tokens.length.toLocaleString("en-GB")}</b>
-          </div>
-        </div>
-
         <section id="here" className="bx-trade">
           <p className="xs-eye">What&rsquo;s here</p>
           <h2 className="bx-h2">
@@ -70,20 +64,38 @@ export default async function Home() {
           </p>
           <div className="bx-cats">
             {CATS.map((c) => (
-              <a key={c.t} className={c.live ? "bx-cat live" : "bx-cat"} href={c.href ?? "#status"}>
+              <a key={c.t} className={c.live ? "bx-cat live" : "bx-cat soon"} href={c.href ?? "#status"}>
                 <span className="bx-cat-ic" aria-hidden="true">{c.ic}</span>
                 <b>{c.t}</b>
                 <span>{c.d}</span>
                 <span className={c.live ? "st live" : "st"}>{c.live ? "Browse" : "Not open yet"}</span>
               </a>
             ))}
+            {/* Phones: the four not-open categories collapse into one compact card. */}
+            <div className="bx-soon">
+              <div className="bx-soon-hd">
+                <b>Coming later</b>
+                <span className="st">Not open yet</span>
+              </div>
+              <ul>
+                {CATS.filter((c) => !c.live).map((c) => (
+                  <li key={c.t}>
+                    <span className="bx-cat-ic" aria-hidden="true">{c.ic}</span>
+                    <span>
+                      <b>{c.t}</b>
+                      <span>{c.s}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
 
         <section id="board">
           <p className="xs-eye">The board</p>
           <h2 className="bx-h2">
-            Already on <i>BSV</i>.
+            Already on <i>BSV</i> <span className="bx-count">· {tokens.length.toLocaleString("en-GB")} tokens listed</span>
           </h2>
           <p className="bx-sub">BSV-21 tokens indexed by 1Sat, listed for information. Details opens each token&rsquo;s deploy transaction on a block explorer.</p>
           {tokens.length ? <Board tokens={tokens} /> : <p className="bx-empty">The token list didn&rsquo;t load. Try again in a minute.</p>}

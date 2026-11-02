@@ -36,14 +36,14 @@ export function Board({ tokens }: { tokens: Token[] }) {
             <span className="bx-mono" aria-hidden="true">{t.symbol.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?"}</span>
             <b>{t.symbol}</b>
             <span className="bx-meta">{t.at ? `Deployed ${since(t.at)}` : shortId(t.id)}</span>
-            <span className="bx-go">Details</span>
+            <span className="bx-go">Details &rarr;</span>
           </a>
         ))}
         {!list.length && <p className="bx-empty">No tokens match.</p>}
       </div>
       {list.length > PAGE && (
         <div className="bx-more">
-          <button type="button" className="chip" onClick={() => setAll(!all)}>
+          <button type="button" className="chip" aria-expanded={all} onClick={() => setAll(!all)}>
             {all ? "Show fewer" : `Show all ${list.length}`}
           </button>
         </div>

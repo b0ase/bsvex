@@ -1,5 +1,7 @@
 # BSV Exchange
 
+**Licence: [Open BSV License version 4](LICENSE)**, © The Bitcoin Corporation Ltd. (GitHub labels it "Other" because it is not on GitHub's standard licence list.)
+
 A modern web application for burning L1 tokens (ETH, SOL, AVAX, TRX, BTC) and receiving BSV in return. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
 ## Features
